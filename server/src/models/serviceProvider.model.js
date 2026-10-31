@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const serviceProviderSchema = new mongoose.Schema(
+const providerSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -8,7 +8,15 @@ const serviceProviderSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-
+    businessPhone: {
+      type: String,
+      required: [true, "Business phone number is required"],
+      trim: true,
+      match: [
+        /^\+?[0-9]{10,15}$/,
+        "Please provide a valid business phone number",
+      ],
+    },
     businessName: {
       type: String,
       required: [true, "Business name is required"],
@@ -28,10 +36,18 @@ const serviceProviderSchema = new mongoose.Schema(
       default: 0,
     },
 
-    category: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Category",
+    categories: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Category",
+        },
+      ],
       required: true,
+      validate: {
+        validator: (value) => Array.isArray(value) && value.length > 0,
+        message: "At least one category is required",
+      },
     },
 
     serviceAreas: [
@@ -94,14 +110,11 @@ const serviceProviderSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-serviceProviderSchema.index({ location: "2dsphere" });
+providerSchema.index({ location: "2dsphere" });
 
-const ServiceProvider = mongoose.model(
-  "ServiceProvider",
-  serviceProviderSchema
-);
+const ServiceProvider = mongoose.model("provider", providerSchema);
 
 export default ServiceProvider;

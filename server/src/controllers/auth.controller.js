@@ -16,7 +16,7 @@ import bcrypt from "bcrypt";
 
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role,phone } = req.body;
     const isAreadyExist = await User.findOne({ email });
     if (isAreadyExist) {
       return res.status(400).json({
@@ -29,7 +29,8 @@ export const register = async (req, res) => {
       email,
       password: await bcrypt.hash(password, 10),
       role,
-    });
+      phone
+    })
 
     const refreshToken = genRefreshToken(user._id);
     const accessToken = genAccessToken(user._id);

@@ -5,7 +5,7 @@ import { loginValidator } from "../validator/login.validator.js";
 import { validateRequest } from "../validator/validateRequest.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/role.middleware.js";
-import { updateServiceProviderValidator, updateUserProfileValidator } from "../validator/updateProfile.validator.js";
+import { updateUserProfileValidator } from "../validator/updateProfile.validator.js";
 
 
 const authRoute = Router();
@@ -89,22 +89,6 @@ authRoute.patch(
   validateRequest,
   updateUserProfile
 );
-
-
-
-
-/**
- * Update the authenticated service provider's profile.
- *
- * Updates basic user fields such as name, phone, and avatar
- * along with service provider-specific profile information.
- *
- * @route   PATCH /api/auth/provider/profile
- * @access  Private/Provider
- * @body    name, phone, avatar, businessName, description,
- *          experienceYears, serviceAreas, location, availabilityStatus
- * @returns Updated service provider profile
- */
 
 
 
