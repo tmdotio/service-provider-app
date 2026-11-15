@@ -422,7 +422,9 @@ export const getProviderPublicProfile = async (req, res) => {
       match: { isActive: true },
       select: "name avatar createdAt",
     })
-    .populate("categories", "name");
+    .populate("categories", "name")
+    // Phone is shared only with customers who book (see booking details)
+    .select("-businessPhone");
 
   if (!provider || !provider.user) {
     throw new ApiError(404, "Provider not found");

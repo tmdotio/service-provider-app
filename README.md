@@ -1,4 +1,4 @@
-# Service Provider App — Backend
+# KaamWala — Service Provider App (MERN)
 
 A local services marketplace API (plumbers, electricians, carpenters...). Customers find a provider, book them, and track the job. Afterwards they review the provider and post photos of the work. Admins approve providers and moderate posts.
 
@@ -59,6 +59,16 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 
 ---
 
+## Frontend (React)
+
+`client/`: React 19 · Vite · Tailwind CSS v4 · React Router · Redux Toolkit · Axios
+
+- **Customers:** search providers with filters (kept in the URL). Book a provider, cancel, report "provider didn't come" (it unlocks 1 hour after the provider accepts), and leave reviews. Share photos of the work.
+- **Providers:** dashboard to go online or offline. Accept, reject, complete or cancel jobs (the customer's phone is shown once a job is accepted). Post photos of your work, reply to reviews, and edit your business profile.
+- **Admins:** overview with stats, approve or reject providers, moderate reported posts, and manage categories, users and bookings.
+- **Everyone:** notification bell (checks every 30 seconds), work feed with likes, comments and reports, and a profile photo upload (images are checked to be under 1 MB in the browser first).
+- **Auth:** the access token is kept only in memory. An Axios interceptor refreshes it automatically using the httpOnly cookie, and many requests that fail at the same time share one refresh call. The session is restored after a page reload.
+
 ## Getting started
 
 ```bash
@@ -70,6 +80,23 @@ npm run dev               # http://localhost:5001
 ```
 
 MongoDB must support transactions (MongoDB Atlas does; a local server must run as a replica set).
+
+In a second terminal:
+
+```bash
+cd client
+npm install
+npm run dev               # http://localhost:5173 (calls /api on port 5001)
+```
+
+### Demo mode (no setup needed)
+
+```bash
+cd server && npm run demo                                   # API on :5051 with sample data
+cd client && VITE_PROXY_TARGET=http://localhost:5051 npm run dev
+```
+
+Demo mode runs on a temporary in-memory database filled with sample providers, bookings, reviews and posts. The logins are listed at the top of `server/scripts/demo.js`. Your real database is never touched.
 
 ### Tests
 

@@ -62,6 +62,7 @@ describe("Provider search & profile", () => {
     expect(res.status).toBe(200);
     expect(res.body.provider.businessName).toBe("Zain Services");
     expect(res.body).toHaveProperty("latestReviews");
+    expect(res.body.provider.businessPhone).toBeUndefined();
 
     const search = await api().get("/api/provider?limit=1&page=1");
     expect(search.body.pagination).toMatchObject({ page: 1, limit: 1 });
