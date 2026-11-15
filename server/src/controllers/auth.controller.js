@@ -1,6 +1,7 @@
 import { genAccessToken, genRefreshToken, verifyRefreshToken } from "../config/access-refresh-token.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
+import ServiceProvider from "../models/serviceProvider.model.js";
 
 /**
  * Register a new user.
@@ -16,7 +17,7 @@ import bcrypt from "bcrypt";
 
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role,phone } = req.body;
+    const { name, email, password, phone } = req.body;
     const isAreadyExist = await User.findOne({ email });
     if (isAreadyExist) {
       return res.status(400).json({
@@ -28,7 +29,9 @@ export const register = async (req, res) => {
       name,
       email,
       password: await bcrypt.hash(password, 10),
-      role,
+      // Everyone starts as a customer. To become a provider the user
+      // applies (POST /api/provider/become-provider) and an admin approves.
+      role: "customer",
       phone
     })
 
@@ -43,7 +46,8 @@ export const register = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.status(200).json({
+    res.status(201).json({
+      success: true,
       message: "User registered successfully!",
       user: {
         id: user._id,
@@ -105,11 +109,19 @@ export const login = async (req, res) => {
       });
     }
 
-    
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated",
+      });
+    }
+
     const accessToken = genAccessToken(user._id);
     const refreshToken = genRefreshToken(user._id);
 
-   
+    // FIX: save it, so refresh-token can check it and logout can revoke it
+    await User.findByIdAndUpdate(user._id, { refreshToken });
+
     res.cookie("refresh-token", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -152,7 +164,8 @@ export const login = async (req, res) => {
  */
 export const refreshAccessToken = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    // FIX: the cookie is named "refresh-token" (it was read as "refreshToken")
+    const refreshToken = req.cookies?.["refresh-token"];
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -163,7 +176,29 @@ export const refreshAccessToken = async (req, res) => {
 
     const decoded = verifyRefreshToken(refreshToken);
 
-    const accessToken = genAccessToken(decoded.userId);
+    // The token must be the latest one saved for this user.
+    // After logout (token = null) it stops working.
+    const user = await User.findById(decoded.userId).select(
+      "+refreshToken isActive",
+    );
+
+    if (!user || !user.isActive || user.refreshToken !== refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token",
+      });
+    }
+
+    // Rotate: give a new refresh token every time
+    const accessToken = genAccessToken(user._id);
+    const newRefreshToken = genRefreshToken(user._id);
+    await User.findByIdAndUpdate(user._id, { refreshToken: newRefreshToken });
+
+    res.cookie("refresh-token", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return res.status(200).json({
       success: true,
@@ -188,17 +223,42 @@ export const refreshAccessToken = async (req, res) => {
  */
 export const getMe = async (req, res) => {
   try {
+    const user = await User.findById(req.user._id)
+      .select("-password -refreshToken")
+      .lean()
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const profile = { ...user };
+
+    if (user.role === "provider") {
+      const provider = await ServiceProvider.findOne({
+        user: user._id,
+        verificationStatus: "approved",
+      })
+        .populate("categories", "name")
+        .lean();
+
+      profile.providerProfile = provider;
+    }
+
+
     return res.status(200).json({
       success: true,
-      message: "User fetched successfully",
-      user: req.user,
+      message: "Profile fetched successfully",
+      data: profile,
     });
   } catch (error) {
-    console.error("Error occurred while fetching user:", error);
+    console.error("Get Me Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Failed to fetch profile",
     });
   }
 };

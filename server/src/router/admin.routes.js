@@ -1,7 +1,10 @@
 import { Router } from "express";
 import {
   deleteUserByAdmin,
+  getAllBookings,
   getAllProviders,
+  getReports,
+  resolveReports,
   getAllUsers,
   getDashboardStats,
   getPendingProviderRequests,
@@ -14,6 +17,8 @@ import {
 } from "../controllers/admin.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/role.middleware.js";
+import { validateObjectId } from "../middlewares/validateObjectId.js";
+import { validateRequest } from "../validator/validateRequest.js";
 
 import {
   createCategory,
@@ -234,7 +239,7 @@ adminRoute.post(
   authenticate,
   authorizeRoles("admin"),
   validateCategory,
-  
+  validateRequest,
   createCategory,
 );
 
@@ -249,7 +254,7 @@ adminRoute.patch(
   authenticate,
   authorizeRoles("admin"),
   validateCategory,
-  
+  validateRequest,
   updateCategory,
 );
 
@@ -264,6 +269,42 @@ adminRoute.delete(
   authenticate,
   authorizeRoles("admin"),
   deleteCategory,
+);
+
+/**
+ * All bookings (filter by ?status=).
+ *
+ * @route   GET /api/admin/bookings
+ * @access  Private/Admin
+ */
+adminRoute.get(
+  "/bookings",
+  authenticate,
+  authorizeRoles("admin"),
+  getAllBookings,
+);
+
+/**
+ * Reported posts grouped by post.
+ *
+ * @route   GET /api/admin/reports?status=pending
+ * @access  Private/Admin
+ */
+adminRoute.get("/reports", authenticate, authorizeRoles("admin"), getReports);
+
+/**
+ * Resolve reports of a post.
+ *
+ * @route   PATCH /api/admin/reports/:postId
+ * @access  Private/Admin
+ * @body    action: "remove" | "dismiss"
+ */
+adminRoute.patch(
+  "/reports/:postId",
+  authenticate,
+  authorizeRoles("admin"),
+  validateObjectId("postId"),
+  resolveReports,
 );
 
 export default adminRoute;

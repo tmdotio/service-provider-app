@@ -30,10 +30,6 @@ export const registerValidator = [
     .isLength({ min: 8 })
     .withMessage("Password must be at least 8 characters"),
 
-  body("role")
-    .optional()
-    .isIn(["customer", "provider"])
-    .withMessage("Role must be customer or provider"),
 ];
 
 

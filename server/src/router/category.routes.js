@@ -1,14 +1,17 @@
-import { getProvidersByCategory } from "../controllers/category.controller.js";
+import { Router } from "express";
+import { getAllCategories } from "../controllers/category.controller.js";
 
+const categoryRoute = Router();
 
 /**
- ** filter by category
- * Get providers by selected category. fileer category
+ * List all categories with provider counts (cached in Redis).
  *
- * @route   GET /api/provider/category/:categoryId
+ * @route   GET /api/categories
  * @access  Public
+ *
+ * Providers of one category: GET /api/provider/category/:categoryId
+ * Admin create/update/delete: /api/admin/categories
  */
-providerRoute.get(
-  "/category/:categoryId",
-  getProvidersByCategory
-);
+categoryRoute.get("/", getAllCategories);
+
+export default categoryRoute;
