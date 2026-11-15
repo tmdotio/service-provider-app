@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import api from "../api/axios";
 import ProviderCard from "../components/ProviderCard";
-import { EmptyState, ErrorBox, PageHeader, Pagination, Spinner } from "../components/ui";
+import { EmptyState, ErrorBox, PageHeader, Pagination, SkeletonGrid } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 
 /**
@@ -50,11 +50,11 @@ export default function Providers() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <PageHeader
-        title="Find a pro"
-        subtitle={data ? `${data.pagination.total} provider${data.pagination.total === 1 ? "" : "s"} found` : " "}
+        title="Find a provider"
+        subtitle={data ? `${data.pagination.total} provider${data.pagination.total === 1 ? "" : "s"} found` : "Searching…"}
       />
 
-      <div className="glass mb-8 grid gap-2 rounded-[32px] p-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="search-glow glass mb-2 grid gap-2 rounded-[32px] p-3 sm:grid-cols-2 lg:grid-cols-5">
         <input className="input lg:col-span-2" placeholder="Search by name or service..." value={q} onChange={(e) => setQ(e.target.value)} />
         <input className="input" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
         <select className="input" value={params.get("category") || ""} onChange={(e) => setFilter("category", e.target.value)}>
@@ -90,15 +90,25 @@ export default function Providers() {
         </div>
       </div>
 
+      {/* Thin loading line while results load */}
+      <div className="mb-6 h-0.5 overflow-hidden rounded-full" aria-hidden="true">
+        {loading && <div className="h-full w-2/5 animate-[indeterminate_1s_ease-in-out_infinite] rounded-full bg-accent" />}
+      </div>
+
       <ErrorBox message={error} />
 
       {loading && !data ? (
-        <Spinner />
+        <SkeletonGrid count={8} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />
       ) : data?.providers.length === 0 ? (
         <EmptyState icon={SearchX} title="No providers found" text="Try another city or service, or remove some filters." />
       ) : (
-        <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
-          {data?.providers.map((p) => <ProviderCard key={p._id} provider={p} />)}
+        // key=query: every new search replays the rise-in animation
+        <div key={query} className={`grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${loading ? "opacity-50" : ""}`}>
+          {data?.providers.map((p, i) => (
+            <div key={p._id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}>
+              <ProviderCard provider={p} />
+            </div>
+          ))}
         </div>
       )}
 

@@ -12,7 +12,7 @@ import useAuth from "./useAuth";
 
 /**
  * Menu items depend on who is logged in, so every role sees names
- * that make sense for them (a provider doesn't need "Find pros").
+ * that make sense for them (a provider doesn't need "Find providers").
  *
  * `short` is the label in the phone bottom bar (space is tight there).
  * `desktop: false` items only show in the phone bottom bar (the top bar
@@ -38,7 +38,7 @@ export default function useNavLinks() {
       home: "/admin",
       links: [
         { to: "/admin", label: "Control room", short: "Admin", icon: ShieldCheck },
-        { to: "/providers", label: "Pros", icon: Compass },
+        { to: "/providers", label: "Providers", icon: Compass },
         { to: "/feed", label: "Work board", short: "Board", icon: Images },
         { to: "/account", label: "Profile", icon: User, desktop: false },
       ],
@@ -50,7 +50,7 @@ export default function useNavLinks() {
       home: "/",
       links: [
         { to: "/", label: "Home", icon: Home, desktop: false },
-        { to: "/providers", label: "Find pros", short: "Pros", icon: Compass },
+        { to: "/providers", label: "Find providers", short: "Providers", icon: Compass },
         { to: "/bookings", label: "Bookings", icon: CalendarCheck },
         { to: "/feed", label: "Work board", short: "Board", icon: Images },
         { to: "/account", label: "Profile", icon: User, desktop: false },
@@ -63,7 +63,7 @@ export default function useNavLinks() {
     home: "/",
     links: [
       { to: "/", label: "Home", icon: Home, desktop: false },
-      { to: "/providers", label: "Find pros", short: "Pros", icon: Compass },
+      { to: "/providers", label: "Find providers", short: "Providers", icon: Compass },
       { to: "/feed", label: "Work board", short: "Board", icon: Images },
       { to: "/login", label: "Log in", icon: User, desktop: false },
     ],

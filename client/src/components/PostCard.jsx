@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router";
 import api, { getErrorMessage } from "../api/axios";
 import useAuth from "../hooks/useAuth";
 import { timeAgo } from "../utils/format";
-import { Avatar, Modal } from "./ui";
+import { Avatar, Img, Modal } from "./ui";
 
 const REPORT_REASONS = ["spam", "fake", "abusive", "inappropriate", "other"];
 
@@ -269,7 +269,7 @@ export default function PostCard({ post: initialPost, onDeleted }) {
             ].map(([label, img]) =>
               img ? (
                 <a key={label} href={img.url} target="_blank" rel="noreferrer" className="relative block">
-                  <img src={img.url} alt={`${label} the job`} loading="lazy" className="aspect-[4/5] w-full object-cover sm:aspect-square" />
+                  <Img src={img.url} alt={`${label} the job`} width={480} className="aspect-[4/5] w-full sm:aspect-square" />
                   <span
                     className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
                       label === "After" ? "bg-accent text-accent-ink" : "bg-black/60 text-white backdrop-blur"
@@ -285,11 +285,11 @@ export default function PostCard({ post: initialPost, onDeleted }) {
           <div className={`grid gap-0.5 ${afterImgs.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
             {afterImgs.map((img, i) => (
               <a key={img.url} href={img.url} target="_blank" rel="noreferrer">
-                <img
+                <Img
                   src={img.url}
                   alt={`Photo ${i + 1}`}
-                  loading="lazy"
-                  className={`w-full object-cover ${afterImgs.length === 1 ? "max-h-[28rem]" : "aspect-square"}`}
+                  width={afterImgs.length === 1 ? 900 : 480}
+                  className={`w-full ${afterImgs.length === 1 ? "aspect-[4/3] max-h-[28rem]" : "aspect-square"}`}
                 />
               </a>
             ))}
@@ -301,7 +301,7 @@ export default function PostCard({ post: initialPost, onDeleted }) {
         <div className="flex gap-1 overflow-x-auto px-4 pt-2">
           {[...beforeImgs.slice(1), ...afterImgs.slice(1)].map((img) => (
             <a key={img.url} href={img.url} target="_blank" rel="noreferrer" className="shrink-0">
-              <img src={img.url} alt="" loading="lazy" className="h-16 w-16 rounded-xl object-cover" />
+              <Img src={img.url} width={64} height={64} className="h-16 w-16 rounded-xl" />
             </a>
           ))}
         </div>

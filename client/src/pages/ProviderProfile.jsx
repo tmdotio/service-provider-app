@@ -8,6 +8,10 @@ import PostCard from "../components/PostCard";
 import {
   Avatar,
   Chips,
+  Img,
+  PostSkeleton,
+  Skeleton,
+  SkeletonGrid,
   EmptyState,
   ErrorBox,
   Modal,
@@ -180,7 +184,7 @@ function Posts({ provider }) {
       />
 
       {loading ? (
-        <Spinner />
+        <SkeletonGrid count={2} item={PostSkeleton} className="grid gap-4 md:grid-cols-2" />
       ) : data?.posts.length === 0 ? (
         <EmptyState icon={Images} title="No posts yet" text="Before/after photos of this provider's jobs will appear here." />
       ) : (
@@ -198,6 +202,40 @@ function Posts({ provider }) {
   );
 }
 
+/** Same layout as the profile, as shimmering blocks */
+function ProfileSkeleton() {
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-10" role="status" aria-label="Loading profile">
+      <div className="card overflow-hidden">
+        <span className="skeleton block h-36 sm:h-56" />
+        <div className="px-6 pb-6">
+          <div className="-mt-12 flex items-end justify-between">
+            <span className="rounded-full bg-surface p-1.5">
+              <Skeleton className="h-24 w-24" />
+            </span>
+            <Skeleton className="h-12 w-32" />
+          </div>
+          <Skeleton className="mt-5 h-9 w-2/3 max-w-sm" />
+          <Skeleton className="mt-3 h-4 w-32" />
+          <div className="mt-5 flex gap-2">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-6 border-t border-line pt-6 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-28" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-8 flex gap-2">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-36" />
+      </div>
+    </div>
+  );
+}
+
 export default function ProviderProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -207,7 +245,7 @@ export default function ProviderProfile() {
 
   const { data, loading, error } = useFetch(() => api.get(`/provider/${id}`), [id]);
 
-  if (loading) return <Spinner className="py-20" />;
+  if (loading) return <ProfileSkeleton />;
   if (error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
@@ -232,7 +270,7 @@ export default function ProviderProfile() {
       <div className="card overflow-hidden">
         <div className="relative h-36 bg-accent-gradient sm:h-56">
           {provider.bannerImage?.url ? (
-            <img src={provider.bannerImage.url} alt="" className="h-full w-full object-cover" />
+            <Img src={provider.bannerImage.url} width={1200} priority className="h-full w-full" />
           ) : (
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgb(255_255_255/0.35),transparent_45%)]" />
           )}
@@ -240,7 +278,7 @@ export default function ProviderProfile() {
         <div className="px-6 pb-6">
           <div className="relative -mt-12 flex flex-wrap items-end justify-between gap-4">
             <div className="rounded-full bg-surface p-1.5">
-              <Avatar user={provider.user} size="h-24 w-24" />
+              <Avatar user={provider.user} size="h-24 w-24" priority />
             </div>
             {!isOwnPage && (
               <div className="flex items-center gap-3">

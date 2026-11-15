@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
-import { EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
+import { EmptyState, ErrorBox, PageHeader, PostSkeleton, SkeletonGrid } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 
 export default function Feed() {
@@ -33,18 +33,20 @@ export default function Feed() {
 
       <p className="mb-6 rounded-[20px] border border-accent/30 bg-accent/10 px-5 py-3.5 text-sm">
         Real jobs posted by our pros, with before/after photos. Have a question? Ask in the comments — the pro can reply.{" "}
-        <Link to="/providers" className="font-semibold text-accent underline underline-offset-2">Find a pro</Link>
+        <Link to="/providers" className="font-semibold text-accent underline underline-offset-2">Find a provider</Link>
       </p>
 
       <ErrorBox message={error} />
 
       <div className="space-y-4">
-        {posts.map((p) => (
-          <PostCard key={p._id} post={p} onDeleted={(id) => setPosts((list) => list.filter((x) => x._id !== id))} />
+        {posts.map((p, i) => (
+          <div key={p._id} className="animate-rise" style={{ animationDelay: `${(i % 10) * 60}ms` }}>
+            <PostCard post={p} onDeleted={(id) => setPosts((list) => list.filter((x) => x._id !== id))} />
+          </div>
         ))}
       </div>
 
-      {loading && <Spinner />}
+      {loading && <SkeletonGrid count={page === 1 ? 2 : 1} item={PostSkeleton} className="mt-4 space-y-4" />}
 
       {!loading && posts.length === 0 && (
         <EmptyState icon={Images} title="No posts yet" text="Be the first to share a photo of great work." />

@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
 import ProviderCard from "../components/ProviderCard";
-import { Chips, DisplayTitle, SectionPill, Spinner, Stat } from "../components/ui";
+import { Chips, DisplayTitle, SectionPill, SkeletonGrid, Stat } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 import { APP_TAGLINE } from "../utils/format";
 
@@ -55,20 +55,20 @@ export default function Home() {
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted">
               <ShieldCheck className="h-3.5 w-3.5 text-accent" /> {APP_TAGLINE}
             </p>
-            <DisplayTitle className="text-[clamp(2.75rem,11vw,6rem)]">Find a pro</DisplayTitle>
+            <DisplayTitle className="text-[clamp(2.1rem,8.6vw,5.5rem)]">Find a provider</DisplayTitle>
             <p className="mt-4 max-w-md text-muted">
               Plumbers, electricians, carpenters and more. Real reviews, real photos of their work, and no-shows shown in public.
             </p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-4 sm:gap-x-10">
-            <Stat value={proTotal} label="Pros" badge="verified" />
+            <Stat value={proTotal} label="Providers" badge="verified" />
             <Stat value={availablePros.data?.pagination.total ?? "–"} label="Online" badge="now" tone="green" />
             <Stat value={categories.data?.count ?? "–"} label="Services" />
           </div>
         </div>
 
         {/* Search capsule, like the "Your Schedule" bar in the reference */}
-        <form onSubmit={search} className="glass mt-10 flex flex-col gap-2 rounded-[32px] p-2 shadow-xl shadow-black/5 sm:flex-row sm:items-center sm:rounded-full">
+        <form onSubmit={search} className="search-glow glass mt-10 flex flex-col gap-2 rounded-[32px] p-2 shadow-xl shadow-black/5 sm:flex-row sm:items-center sm:rounded-full">
           <label className="flex flex-1 items-center gap-3 rounded-full bg-surface px-5 py-3">
             <Search className="h-5 w-5 shrink-0 text-muted" />
             <input
@@ -89,8 +89,8 @@ export default function Home() {
               aria-label="City"
             />
           </label>
-          <button className="btn bg-accent-gradient h-12 px-7 text-accent-ink shadow-lg shadow-orange-500/20 hover:brightness-105">
-            Search <ArrowRight className="h-4 w-4" />
+          <button className="group btn bg-accent-gradient h-12 px-7 text-accent-ink shadow-lg shadow-orange-500/20 hover:brightness-105">
+            Search <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </button>
         </form>
       </section>
@@ -98,22 +98,26 @@ export default function Home() {
       {/* Pros */}
       <section className="mt-16">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <SectionPill count={proTotal}>Top pros</SectionPill>
+          <SectionPill count={proTotal}>Top providers</SectionPill>
           <Chips options={PRO_FILTERS} value={filter} onChange={setFilter} />
         </div>
-        {pros.loading && !pros.data ? (
-          <Spinner />
+        {pros.loading ? (
+          <SkeletonGrid count={4} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" />
         ) : (
-          <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-4 ${pros.loading ? "opacity-60" : ""}`}>
-            {pros.data?.providers.map((p) => <ProviderCard key={p._id} provider={p} />)}
+          <div key={filter} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {pros.data?.providers.map((p, i) => (
+              <div key={p._id} className="animate-rise" style={{ animationDelay: `${i * 70}ms` }}>
+                <ProviderCard provider={p} />
+              </div>
+            ))}
             {pros.data?.providers.length === 0 && (
-              <p className="col-span-full py-10 text-center text-muted">No pros match this filter yet.</p>
+              <p className="col-span-full py-10 text-center text-muted">No providers match this filter yet.</p>
             )}
           </div>
         )}
         <div className="mt-6 text-center">
           <Link to="/providers" className="btn-outline">
-            See all pros <ArrowRight className="h-4 w-4" />
+            See all providers <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>

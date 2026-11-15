@@ -7,6 +7,7 @@ import express from "express";
 import helmet from "helmet";
 
 import { authenticate } from "./middlewares/auth.middleware.js";
+import { invalidateProvidersOnWrite } from "./middlewares/cacheInvalidation.middleware.js";
 import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import { authorizeRoles } from "./middlewares/role.middleware.js";
 import User from "./models/user.model.js";
@@ -48,6 +49,12 @@ app.get("/", (req, res) => {
 app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, status: "ok" });
 });
+
+// Changes to these keep the Redis provider cache fresh (see the middleware)
+app.use(
+  ["/api/provider", "/api/booking", "/api/reviews", "/api/posts", "/api/admin", "/api/upload", "/api/auth"],
+  invalidateProvidersOnWrite,
+);
 
 app.use("/api/auth", authRoute);
 app.use("/api/provider", providerRoute);

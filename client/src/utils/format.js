@@ -46,3 +46,14 @@ export const checkImageFile = (file) => {
   }
   return null;
 };
+
+/**
+ * ImageKit can resize on the fly: ask for the size we really show
+ * (x2 for sharp phone screens) instead of downloading the full photo.
+ * Other URLs (data:, other hosts) are returned unchanged.
+ */
+export const ikUrl = (url, { w, h, face = false } = {}) => {
+  if (!url || !url.includes("ik.imagekit.io")) return url;
+  const parts = [w && `w-${w * 2}`, h && `h-${h * 2}`, face && "fo-face", "q-80", "f-auto"].filter(Boolean);
+  return `${url}${url.includes("?") ? "&" : "?"}tr=${parts.join(",")}`;
+};

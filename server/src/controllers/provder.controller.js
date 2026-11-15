@@ -6,6 +6,7 @@ import Post from "../models/post.model.js";
 import Review from "../models/review.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
 import { deleteImages, uploadImage } from "../services/imageStorage.service.js";
+import { cacheProviders, stableQueryKey } from "../services/cache.service.js";
 import ApiError from "../utils/ApiError.js";
 import {
   escapeRegex,
@@ -346,58 +347,63 @@ export const searchProviders = async (req, res) => {
     experience: { experienceYears: -1 },
   };
 
-  const [result] = await ServiceProvider.aggregate([
-    { $match: match },
-    // Only providers whose user account is active
-    {
-      $lookup: {
-        from: "users",
-        localField: "user",
-        foreignField: "_id",
-        as: "user",
-        pipeline: [{ $project: { name: 1, avatar: 1, isActive: 1 } }],
+  // Same filters -> same Redis key. Cached 2 minutes, and cleared at once
+  // whenever any provider data changes (see invalidateProviders).
+  const result = await cacheProviders(`search:${stableQueryKey(req.query)}`, 120, async () => {
+    const [aggregated] = await ServiceProvider.aggregate([
+      { $match: match },
+      // Only providers whose user account is active
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "user",
+          pipeline: [{ $project: { name: 1, avatar: 1, isActive: 1 } }],
+        },
       },
-    },
-    { $unwind: "$user" },
-    { $match: { "user.isActive": true } },
-    { $sort: { ...(sortOptions[sort] || sortOptions.rating), _id: 1 } },
-    {
-      $facet: {
-        providers: [
-          { $skip: skip },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "categories",
-              localField: "categories",
-              foreignField: "_id",
-              as: "categories",
-              pipeline: [{ $project: { name: 1 } }],
+      { $unwind: "$user" },
+      { $match: { "user.isActive": true } },
+      { $sort: { ...(sortOptions[sort] || sortOptions.rating), _id: 1 } },
+      {
+        $facet: {
+          providers: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $lookup: {
+                from: "categories",
+                localField: "categories",
+                foreignField: "_id",
+                as: "categories",
+                pipeline: [{ $project: { name: 1 } }],
+              },
             },
-          },
-          {
-            $project: {
-              businessName: 1,
-              description: 1,
-              experienceYears: 1,
-              categories: 1,
-              location: 1,
-              availabilityStatus: 1,
-              averageRating: 1,
-              totalReviews: 1,
-              completedJobs: 1,
-              noShowCount: 1,
-              "bannerImage.url": 1,
-              "user._id": 1,
-              "user.name": 1,
-              "user.avatar": 1,
+            {
+              $project: {
+                businessName: 1,
+                description: 1,
+                experienceYears: 1,
+                categories: 1,
+                location: 1,
+                availabilityStatus: 1,
+                averageRating: 1,
+                totalReviews: 1,
+                completedJobs: 1,
+                noShowCount: 1,
+                "bannerImage.url": 1,
+                "user._id": 1,
+                "user.name": 1,
+                "user.avatar": 1,
+              },
             },
-          },
-        ],
-        total: [{ $count: "count" }],
+          ],
+          total: [{ $count: "count" }],
+        },
       },
-    },
-  ]);
+    ]);
+    return aggregated;
+  });
 
   const total = result.total[0]?.count || 0;
 
@@ -415,37 +421,40 @@ export const searchProviders = async (req, res) => {
  * @access  Public
  */
 export const getProviderPublicProfile = async (req, res) => {
-  const provider = await ServiceProvider.findOne({
-    _id: req.params.id,
-    verificationStatus: "approved",
-  })
-    .populate({
-      path: "user",
-      match: { isActive: true },
-      select: "name avatar createdAt",
+  const data = await cacheProviders(`profile:${req.params.id}`, 300, async () => {
+    const provider = await ServiceProvider.findOne({
+      _id: req.params.id,
+      verificationStatus: "approved",
     })
-    .populate("categories", "name")
-    // Phone is shared only with customers who book (see booking details)
-    .select("-businessPhone");
+      .populate({
+        path: "user",
+        match: { isActive: true },
+        select: "name avatar createdAt",
+      })
+      .populate("categories", "name")
+      // Phone is shared only with customers who book (see booking details)
+      .select("-businessPhone")
+      .lean();
 
-  if (!provider || !provider.user) {
+    if (!provider || !provider.user) return null;
+
+    const [latestReviews, postsCount] = await Promise.all([
+      Review.find({ provider: provider._id })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate("customer", "name avatar")
+        .lean(),
+      Post.countDocuments({ provider: provider._id, isHidden: false }),
+    ]);
+
+    return { provider, latestReviews, postsCount };
+  });
+
+  if (!data) {
     throw new ApiError(404, "Provider not found");
   }
 
-  const [latestReviews, postsCount] = await Promise.all([
-    Review.find({ provider: provider._id })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate("customer", "name avatar"),
-    Post.countDocuments({ provider: provider._id, isHidden: false }),
-  ]);
-
-  res.status(200).json({
-    success: true,
-    provider,
-    latestReviews,
-    postsCount,
-  });
+  res.status(200).json({ success: true, ...data });
 };
 
 /**

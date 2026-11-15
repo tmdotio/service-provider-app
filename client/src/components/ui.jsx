@@ -1,8 +1,8 @@
 import { ArrowUpRight, Loader2, Star, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { startScroll, stopScroll } from "../utils/smoothScroll";
 import { Link } from "react-router";
-import { initials } from "../utils/format";
+import { ikUrl, initials } from "../utils/format";
 
 /* ---------- Brand bits ---------- */
 
@@ -166,9 +166,53 @@ export function ErrorBox({ message }) {
   );
 }
 
-export function Avatar({ user, size = "h-11 w-11" }) {
+/**
+ * Image that shows a shimmer until it has loaded, then fades in.
+ * `priority` loads it first (e.g. profile avatar/banner at the top).
+ */
+export function Img({ src, alt = "", className = "", imgClassName = "", priority = false, width, height, face }) {
+  const ref = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const finalSrc = ikUrl(src, { w: width, h: height, face });
+
+  // Already in the browser cache: no need to wait for onLoad
+  useEffect(() => {
+    if (ref.current?.complete && ref.current.naturalWidth) setLoaded(true);
+  }, [finalSrc]);
+
+  return (
+    <span className={`relative block overflow-hidden ${loaded ? "" : "skeleton"} ${className}`}>
+      <img
+        ref={ref}
+        src={finalSrc}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
+        className={`h-full w-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+      />
+    </span>
+  );
+}
+
+const AVATAR_PX = { 7: 28, 8: 32, 9: 36, 10: 40, 11: 44, 12: 48, 14: 56, 20: 80, 24: 96 };
+
+export function Avatar({ user, size = "h-11 w-11", priority = false }) {
   if (user?.avatar) {
-    return <img src={user.avatar} alt={user.name || ""} className={`${size} shrink-0 rounded-full object-cover ring-2 ring-surface`} />;
+    const px = AVATAR_PX[Number(size.match(/h-(\d+)/)?.[1])] || 64;
+    return (
+      <Img
+        src={user.avatar}
+        alt={user.name || ""}
+        width={px}
+        height={px}
+        face
+        priority={priority}
+        className={`${size} shrink-0 rounded-full ring-2 ring-surface`}
+      />
+    );
   }
   return (
     <div
@@ -321,6 +365,95 @@ export function Tabs({ tabs, value, onChange }) {
         >
           {label}
         </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Skeleton loaders (shimmer while data loads) ---------- */
+
+export function Skeleton({ className = "" }) {
+  return <span className={`skeleton block rounded-full ${className}`} aria-hidden="true" />;
+}
+
+/** Same shape as ProviderCard, including the notch */
+export function ProviderCardSkeleton() {
+  return (
+    <div className="relative" aria-hidden="true">
+      <div className="notch rounded-[28px] border border-line bg-surface p-5">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-12 w-12" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <Skeleton className="mt-5 h-6 w-3/4" />
+        <Skeleton className="mt-2 h-4 w-1/2" />
+        <div className="mt-8 flex justify-between">
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <Skeleton className="mt-5 h-3 w-16" />
+      </div>
+      <span className="skeleton absolute right-[4px] top-[4px] h-11 w-11 rounded-full" />
+    </div>
+  );
+}
+
+export function PostSkeleton() {
+  return (
+    <div className="card overflow-hidden" aria-hidden="true">
+      <div className="flex items-center gap-3 p-4">
+        <Skeleton className="h-11 w-11" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <div className="space-y-2 px-4 pb-4">
+        <Skeleton className="h-3.5 w-full" />
+        <Skeleton className="h-3.5 w-2/3" />
+      </div>
+      <div className="grid grid-cols-2 gap-0.5">
+        <span className="skeleton block aspect-square" />
+        <span className="skeleton block aspect-square" />
+      </div>
+      <div className="flex gap-3 p-4">
+        <Skeleton className="h-8 w-14" />
+        <Skeleton className="h-8 w-14" />
+      </div>
+    </div>
+  );
+}
+
+export function TaskCardSkeleton() {
+  return (
+    <div className="relative" aria-hidden="true">
+      <div className="notch rounded-[28px] border border-line bg-surface p-5">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-11 w-11" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+        <Skeleton className="mt-6 h-7 w-40" />
+        <Skeleton className="mt-3 h-3.5 w-full" />
+        <Skeleton className="mt-2 h-3.5 w-3/4" />
+        <div className="mt-6 flex justify-between border-t border-line pt-4">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-9 w-24" />
+        </div>
+      </div>
+      <span className="skeleton absolute right-[4px] top-[4px] h-11 w-11 rounded-full" />
+    </div>
+  );
+}
+
+/** Repeat a skeleton n times inside a grid */
+export function SkeletonGrid({ count = 4, item: Item = ProviderCardSkeleton, className = "" }) {
+  return (
+    <div className={className} role="status" aria-label="Loading">
+      {Array.from({ length: count }, (_, i) => (
+        <Item key={i} />
       ))}
     </div>
   );

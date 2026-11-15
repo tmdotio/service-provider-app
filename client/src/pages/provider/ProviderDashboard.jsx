@@ -16,10 +16,12 @@ import {
   NotchCard,
   PageHeader,
   SectionPill,
+  SkeletonGrid,
   Spinner,
   Stars,
   Stat,
   StatusBadge,
+  TaskCardSkeleton,
 } from "../../components/ui";
 import useAuth from "../../hooks/useAuth";
 import useFetch from "../../hooks/useFetch";
@@ -483,7 +485,7 @@ export default function ProviderDashboard() {
               </div>
               <ErrorBox message={bookings.error} />
               {bookings.loading && !bookings.data ? (
-                <Spinner />
+                <SkeletonGrid count={3} item={TaskCardSkeleton} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" />
               ) : list.length === 0 ? (
                 <EmptyState
                   icon={CalendarX}

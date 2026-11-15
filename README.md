@@ -55,8 +55,10 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 - See all bookings, moderate reports, and view a dashboard with booking stats and top providers.
 
 **Redis**
-- The category list is cached and cleared whenever a category changes. `/getusers` is a cached demo endpoint for admins only.
-- The app still works if Redis is down; it just doesn't cache.
+- **Provider search results** (2 min) and **provider profiles** (5 min) are cached. The same filters in any order or letter case use the same key.
+- **Instant invalidation with version keys:** every cached key contains a version (`providers:v7:...`). One middleware runs after any successful change (booking accepted, review, banner, approval, profile edit...) and increases the version with a single `INCR` *before* the response is sent. Old keys are never read again and expire by themselves, so there's no need to find and delete them.
+- The category list is cached and cleared on change; `/getusers` is an admin-only cached demo.
+- Everything falls back to MongoDB if Redis is down. `CACHE_PREFIX` keeps apps apart when they share one Redis.
 
 ---
 
@@ -69,6 +71,8 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 - **Become a provider:** customers open **My profile** and tap **Become a provider**. The application form opens in a popup, and the card then shows "under review" until an admin decides.
 - **Mobile first:** app-style bottom tab bar with role-based sections, popups that slide up as bottom sheets, 16px inputs (no iPhone zoom), safe-area padding for notched phones.
 - **Smooth scrolling** with Lenis (off when the system asks for reduced motion; popups pause it).
+- **Fast images:** ImageKit resizes on the fly to the size shown (x2 for sharp screens, face-centred avatars), images fade in over a shimmer, and the profile banner/avatar load first.
+- **Skeleton loaders** in the same shape as the real content (cards with the notch, posts, profile, jobs), a loading line and staggered fade-in for search results, and a glowing light around the search bar while typing.
 
 - **Customers:** search providers with filters (kept in the URL). Book a provider, cancel, report "provider didn't come" (it unlocks 1 hour after the provider accepts), and leave reviews. Share photos of the work.
 - **Providers:** dashboard to go online or offline. Accept, reject, complete or cancel jobs (the customer's phone is shown once a job is accepted). Post photos of your work, reply to reviews, and edit your business profile.
@@ -111,7 +115,7 @@ Demo mode runs on a temporary in-memory database filled with sample providers, b
 npm test
 ```
 
-There are 47 API tests. They run against an in-memory MongoDB replica set, ImageKit is faked, and your real database is never touched.
+There are 51 API tests (including cache tests with an in-memory fake Redis). They run against an in-memory MongoDB replica set, ImageKit is faked, and your real database is never touched.
 
 ---
 

@@ -12,9 +12,10 @@ import {
   NotchCard,
   PageHeader,
   SectionPill,
-  Spinner,
+  SkeletonGrid,
   Stat,
   StatusBadge,
+  TaskCardSkeleton,
 } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 import { formatDate, timeAgo } from "../utils/format";
@@ -201,12 +202,12 @@ export default function MyBookings() {
       <ErrorBox message={error} />
 
       {loading && !data ? (
-        <Spinner />
+        <SkeletonGrid count={3} item={TaskCardSkeleton} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" />
       ) : bookings.length === 0 ? (
         <EmptyState
           icon={CalendarX}
           title={tab === "active" ? "No active bookings" : "No past bookings"}
-          action={<Link to="/providers" className="btn-primary">Find a pro</Link>}
+          action={<Link to="/providers" className="btn-primary">Find a provider</Link>}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

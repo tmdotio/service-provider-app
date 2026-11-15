@@ -207,7 +207,7 @@ export default function Account() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="relative">
                 <div className="rounded-full bg-surface p-1.5">
-                  <Avatar user={user} size="h-24 w-24" />
+                  <Avatar user={user} size="h-24 w-24" priority />
                 </div>
                 <label className="icon-btn absolute -bottom-1 -right-1 h-9 w-9 cursor-pointer" aria-label="Change photo">
                   {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}

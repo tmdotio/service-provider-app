@@ -91,6 +91,51 @@ body {
   }
 }
 
+/* Skeleton shimmer: a soft light band sweeping across */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Results rise in one after another */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Loading line that slides under the search bar */
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* Rotating light around the search bar while it is focused */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glow-spin {
+  to {
+    --glow-angle: 360deg;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -190,6 +235,69 @@ body {
     #0000 98%,
     #000 100%
   );
+}
+
+/* Grey block with a moving shine, shown while content loads */
+@utility skeleton {
+  background-color: var(--surface-2);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--fg) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Fade + rise in; use style={{ animationDelay }} to stagger */
+@utility animate-rise {
+  animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/*
+ * Search bar glow: a thin orange light runs around the edge while
+ * the user is typing (any input inside is focused).
+ */
+@utility search-glow {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(from var(--glow-angle), transparent 0deg, var(--accent) 60deg, #ffd29a 100deg, transparent 160deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: glow-spin 3s linear infinite;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    z-index: -2;
+    border-radius: inherit;
+    background: var(--accent);
+    filter: blur(28px);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  &:focus-within::before {
+    opacity: 1;
+  }
+
+  &:focus-within::after {
+    opacity: 0.18;
+  }
 }
 
 /* Warm orange gradient used on highlighted cards */
