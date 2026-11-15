@@ -19,7 +19,7 @@ function Bubble({ c, isReply, canDelete, onDelete, isProviderReply }) {
           <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
             <span className="truncate">{c.author?.name}</span>
             {isProviderReply && (
-              <span className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-bold uppercase text-accent-ink">Pro</span>
+              <span className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-bold uppercase text-accent-ink">Provider</span>
             )}
           </span>
           <span className="shrink-0 text-xs text-muted">{timeAgo(c.createdAt)}</span>

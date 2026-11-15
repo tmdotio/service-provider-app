@@ -18,7 +18,7 @@ export default function AuthLayout({ title, subtitle, children }) {
         <div className="absolute -bottom-24 -left-10 h-72 w-72 rounded-full bg-orange-700/30 blur-3xl" />
 
         <p className="relative font-semibold">{APP_NAME}</p>
-        <DisplayTitle as="p" className="relative mt-auto text-6xl" targetColor="currentColor">Book a pro</DisplayTitle>
+        <DisplayTitle as="p" className="relative mt-auto text-5xl" targetColor="currentColor">Book a provider</DisplayTitle>
         <ul className="relative mt-8 space-y-3">
           {POINTS.map((p) => (
             <li key={p} className="flex items-center gap-3 font-medium">

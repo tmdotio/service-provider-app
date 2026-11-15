@@ -36,7 +36,7 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Log in to book pros and track your jobs.">
+    <AuthLayout title="Welcome back" subtitle="Log in to book providers and track your jobs.">
         <form onSubmit={submit} className="space-y-4">
           <ErrorBox message={error} />
           <div>

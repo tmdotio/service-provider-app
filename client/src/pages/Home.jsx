@@ -31,9 +31,9 @@ export default function Home() {
   const [filter, setFilter] = useState("all");
 
   const categories = useFetch(() => api.get("/categories"), []);
-  const allPros = useFetch(() => api.get("/provider", { params: { limit: 1 } }), []);
-  const availablePros = useFetch(() => api.get("/provider", { params: { limit: 1, availability: "available" } }), []);
-  const pros = useFetch(() => api.get("/provider", { params: { ...filterParams[filter], limit: 4 } }), [filter]);
+  const allProviders = useFetch(() => api.get("/provider", { params: { limit: 1 } }), []);
+  const availableProviders = useFetch(() => api.get("/provider", { params: { limit: 1, availability: "available" } }), []);
+  const topProviders = useFetch(() => api.get("/provider", { params: { ...filterParams[filter], limit: 4 } }), [filter]);
   const posts = useFetch(() => api.get("/posts", { params: { limit: 2 } }), []);
 
   const search = (e) => {
@@ -44,7 +44,7 @@ export default function Home() {
     navigate(`/providers?${params}`);
   };
 
-  const proTotal = allPros.data?.pagination.total ?? "–";
+  const providerTotal = allProviders.data?.pagination.total ?? "–";
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
@@ -61,8 +61,8 @@ export default function Home() {
             </p>
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-4 sm:gap-x-10">
-            <Stat value={proTotal} label="Providers" badge="verified" />
-            <Stat value={availablePros.data?.pagination.total ?? "–"} label="Online" badge="now" tone="green" />
+            <Stat value={providerTotal} label="Providers" badge="verified" />
+            <Stat value={availableProviders.data?.pagination.total ?? "–"} label="Online" badge="now" tone="green" />
             <Stat value={categories.data?.count ?? "–"} label="Services" />
           </div>
         </div>
@@ -95,22 +95,22 @@ export default function Home() {
         </form>
       </section>
 
-      {/* Pros */}
+      {/* Top providers */}
       <section className="mt-16">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <SectionPill count={proTotal}>Top providers</SectionPill>
+          <SectionPill count={providerTotal}>Top providers</SectionPill>
           <Chips options={PRO_FILTERS} value={filter} onChange={setFilter} />
         </div>
-        {pros.loading ? (
+        {topProviders.loading ? (
           <SkeletonGrid count={4} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" />
         ) : (
           <div key={filter} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {pros.data?.providers.map((p, i) => (
+            {topProviders.data?.providers.map((p, i) => (
               <div key={p._id} className="animate-rise" style={{ animationDelay: `${i * 70}ms` }}>
                 <ProviderCard provider={p} />
               </div>
             ))}
-            {pros.data?.providers.length === 0 && (
+            {topProviders.data?.providers.length === 0 && (
               <p className="col-span-full py-10 text-center text-muted">No providers match this filter yet.</p>
             )}
           </div>

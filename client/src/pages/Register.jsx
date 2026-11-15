@@ -43,7 +43,7 @@ export default function Register() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="Book trusted pros. Offer a service? Sign up, then tap “Become a provider” on your profile."
+      subtitle="Book trusted providers. Offer a service? Sign up, then tap “Become a provider” on your profile."
     >
         <form onSubmit={submit} className="space-y-4">
           <ErrorBox message={error} />

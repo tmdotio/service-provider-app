@@ -13,7 +13,7 @@ import { fetchMe, updateUser } from "../store/authSlice";
 import { checkImageFile, timeAgo } from "../utils/format";
 
 /**
- * New providers: a short checklist so the pro page looks good from day one.
+ * New providers: a short checklist so the provider page looks good from day one.
  * Each step ticks itself when it's done.
  */
 function ProviderSetup() {
@@ -39,7 +39,7 @@ function ProviderSetup() {
         <p className={`text-xs font-bold uppercase tracking-wider ${allDone ? "text-muted" : "opacity-70"}`}>
           {allDone ? "Your workspace" : `Set up · ${doneCount}/${steps.length}`}
         </p>
-        <h2 className="mt-1 font-wide text-2xl leading-tight">{allDone ? "You're all set" : "Welcome, pro!"}</h2>
+        <h2 className="mt-1 font-wide text-2xl leading-tight">{allDone ? "You're all set" : "Welcome, provider!"}</h2>
       </div>
 
       {/* progress bar */}
@@ -254,7 +254,7 @@ export default function Account() {
             <NotchCard to="/bookings" cornerLabel="Open bookings you made">
               <CalendarCheck className="h-7 w-7 text-accent" />
               <h2 className="mt-4 text-lg font-bold">Bookings you made</h2>
-              <p className="mt-1 text-sm text-muted">Jobs you booked from other pros, before or after becoming a provider.</p>
+              <p className="mt-1 text-sm text-muted">Jobs you booked from other providers, before or after becoming a provider.</p>
             </NotchCard>
           )}
         </div>

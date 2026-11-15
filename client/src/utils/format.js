@@ -1,5 +1,5 @@
 export const APP_NAME = "Ustaad";
-export const APP_TAGLINE = "Skilled pros you can trust";
+export const APP_TAGLINE = "Trusted service providers near you";
 
 /** "5 minutes ago", "2 days ago"... */
 export const timeAgo = (date) => {
