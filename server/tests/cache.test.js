@@ -50,6 +50,8 @@ describe("Redis cache for providers", () => {
     expect(first.status).toBe(200);
     expect(second.body.providers).toEqual(first.body.providers);
     expect(spy).toHaveBeenCalledTimes(1);
+    expect(first.headers["x-cache"]).toBe("MISS");
+    expect(second.headers["x-cache"]).toBe("HIT");
   });
 
   it("a provider change clears the cache, so the next search is fresh", async () => {
@@ -85,6 +87,17 @@ describe("Redis cache for providers", () => {
 
     const res = await api().get(url);
     expect(res.body.provider.description).toBe("New description");
+  });
+
+  it("caches reviews and categories too", async () => {
+    const pro = await createApprovedProvider({ admin, category, name: "Reviews" });
+    const r1 = await api().get(`/api/provider/${pro.providerId}/reviews`);
+    const r2 = await api().get(`/api/provider/${pro.providerId}/reviews`);
+    expect([r1.headers["x-cache"], r2.headers["x-cache"]]).toEqual(["MISS", "HIT"]);
+
+    await api().get("/api/categories");
+    const c2 = await api().get("/api/categories");
+    expect(c2.headers["x-cache"]).toBe("HIT");
   });
 
   it("still works when Redis is down", async () => {

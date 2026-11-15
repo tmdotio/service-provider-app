@@ -172,7 +172,7 @@ function BookingCard({ booking, onChanged }) {
 
 export default function MyBookings() {
   const [tab, setTab] = useState("active");
-  const { data, loading, error, refetch } = useFetch(() => api.get("/booking/customer"), []);
+  const { data, loading, error, refetch } = useFetch(() => api.get("/booking/customer"), [], "my-bookings");
 
   const all = data?.bookings || [];
   const count = (key) => all.filter((b) => TABS[key].includes(b.status)).length;

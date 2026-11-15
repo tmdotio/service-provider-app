@@ -1,13 +1,14 @@
 /**
  * Demo mode: run the API on a temporary in-memory MongoDB filled with
  * sample data. Nothing touches your real database, and everything is
- * deleted when you stop it.
+ * deleted when you stop it. Redis caching is on (separate key prefix).
  *
  *   npm run demo        (API on http://localhost:5051)
  *
  * Demo logins (password for all: demo12345):
  *   admin@demo.test · customer@demo.test · ahmed@demo.test (provider)
  */
+import "dotenv/config";
 import bcrypt from "bcrypt";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 
@@ -16,8 +17,10 @@ const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 process.env.MONGO_URI = replSet.getUri("ustaad-demo");
 process.env.PORT = process.env.PORT || "5051";
 process.env.NODE_ENV = "development";
-// Don't share the real Redis cache with demo data
-process.env.REDIS_URL = "redis://127.0.0.1:1";
+// Use the Redis from .env (if any), but under a fresh "demo:<time>:" prefix,
+// so demo data never mixes with real cache data or an older demo run.
+// Everything cached expires by itself.
+process.env.CACHE_PREFIX = `demo:${Date.now()}:`;
 process.env.ACCESS_TOKEN_SECRETE ||= "demo-access-secret";
 process.env.REFRESH_TOKEN_SECRETE ||= "demo-refresh-secret";
 

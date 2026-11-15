@@ -15,12 +15,13 @@ export default function Providers() {
   const [q, setQ] = useState(params.get("q") || "");
   const [city, setCity] = useState(params.get("city") || "");
 
-  const categories = useFetch(() => api.get("/categories"), []);
+  const categories = useFetch(() => api.get("/categories"), [], "categories");
 
   const query = params.toString();
   const { data, loading, error } = useFetch(
     () => api.get("/provider", { params: Object.fromEntries(new URLSearchParams(query)) }),
     [query],
+    `search:${query}`,
   );
 
   // Typing waits 400ms before searching (debounce)

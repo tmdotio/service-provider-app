@@ -20,7 +20,7 @@ const PROVINCES = [
  * An admin reviews the application before the user becomes a provider.
  */
 export default function BecomeProviderModal({ open, onClose, onSubmitted }) {
-  const categories = useFetch(() => api.get("/categories"), []);
+  const categories = useFetch(() => api.get("/categories"), [], "categories");
   const [form, setForm] = useState({
     businessName: "",
     businessPhone: "",

@@ -98,6 +98,7 @@ function Reviews({ providerId }) {
   const { data, loading } = useFetch(
     () => api.get(`/provider/${providerId}/reviews`, { params: { page, limit: 5 } }),
     [providerId, page],
+    `reviews:${providerId}:${page}`,
   );
 
   if (loading && !data) return <Spinner />;
@@ -174,6 +175,7 @@ function Posts({ provider }) {
   const { data, loading, setData } = useFetch(
     () => api.get("/posts", { params: { provider: provider._id, limit: 20 } }),
     [provider._id],
+    `posts:${provider._id}`,
   );
 
   return (
@@ -243,7 +245,7 @@ export default function ProviderProfile() {
   const [tab, setTab] = useState("reviews");
   const [bookingOpen, setBookingOpen] = useState(false);
 
-  const { data, loading, error } = useFetch(() => api.get(`/provider/${id}`), [id]);
+  const { data, loading, error } = useFetch(() => api.get(`/provider/${id}`), [id], `provider:${id}`);
 
   if (loading) return <ProfileSkeleton />;
   if (error) {

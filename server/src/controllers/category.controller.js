@@ -5,6 +5,7 @@ import {
   CACHE_KEYS,
   clearCache,
   getOrSetCache,
+  setCacheHeader,
 } from "../services/cache.service.js";
 
 /**
@@ -16,6 +17,7 @@ import {
  * @access  Public
  */
 export const getAllCategories = async (req, res) => {
+  const cache = {};
   const categories = await getOrSetCache(CACHE_KEYS.categories, 3600, () =>
     Category.aggregate([
       { $sort: { name: 1 } },
@@ -44,7 +46,10 @@ export const getAllCategories = async (req, res) => {
         },
       },
     ]),
+    cache,
   );
+  setCacheHeader(res, cache);
+
 
   res.status(200).json({
     success: true,

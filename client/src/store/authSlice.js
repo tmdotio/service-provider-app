@@ -4,6 +4,7 @@ import api, {
   refreshAccessToken,
   setAccessToken,
 } from "../api/axios";
+import { clearFetchCache } from "../hooks/useFetch";
 
 /**
  * Load the full profile (get-me also returns providerProfile for providers).
@@ -34,6 +35,7 @@ export const login = createAsyncThunk(
   "auth/login",
   async (credentials, { dispatch, rejectWithValue }) => {
     try {
+      clearFetchCache();
       const res = await api.post("/auth/login", credentials);
       setAccessToken(res.data.accessToken);
       return await dispatch(fetchMe()).unwrap();
@@ -47,6 +49,7 @@ export const register = createAsyncThunk(
   "auth/register",
   async (data, { dispatch, rejectWithValue }) => {
     try {
+      clearFetchCache();
       const res = await api.post("/auth/register", data);
       setAccessToken(res.data.accessToken);
       return await dispatch(fetchMe()).unwrap();
@@ -57,6 +60,7 @@ export const register = createAsyncThunk(
 );
 
 export const logout = createAsyncThunk("auth/logout", async () => {
+  clearFetchCache();
   try {
     await api.post("/auth/logout");
   } finally {

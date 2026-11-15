@@ -6,7 +6,7 @@ import Post from "../models/post.model.js";
 import Review from "../models/review.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
 import { deleteImages, uploadImage } from "../services/imageStorage.service.js";
-import { cacheProviders, stableQueryKey } from "../services/cache.service.js";
+import { cacheProviders, setCacheHeader, stableQueryKey } from "../services/cache.service.js";
 import ApiError from "../utils/ApiError.js";
 import {
   escapeRegex,
@@ -349,6 +349,7 @@ export const searchProviders = async (req, res) => {
 
   // Same filters -> same Redis key. Cached 2 minutes, and cleared at once
   // whenever any provider data changes (see invalidateProviders).
+  const cache = {};
   const result = await cacheProviders(`search:${stableQueryKey(req.query)}`, 120, async () => {
     const [aggregated] = await ServiceProvider.aggregate([
       { $match: match },
@@ -403,7 +404,8 @@ export const searchProviders = async (req, res) => {
       },
     ]);
     return aggregated;
-  });
+  }, cache);
+  setCacheHeader(res, cache);
 
   const total = result.total[0]?.count || 0;
 
@@ -421,6 +423,7 @@ export const searchProviders = async (req, res) => {
  * @access  Public
  */
 export const getProviderPublicProfile = async (req, res) => {
+  const cache = {};
   const data = await cacheProviders(`profile:${req.params.id}`, 300, async () => {
     const provider = await ServiceProvider.findOne({
       _id: req.params.id,
@@ -448,7 +451,8 @@ export const getProviderPublicProfile = async (req, res) => {
     ]);
 
     return { provider, latestReviews, postsCount };
-  });
+  }, cache);
+  setCacheHeader(res, cache);
 
   if (!data) {
     throw new ApiError(404, "Provider not found");

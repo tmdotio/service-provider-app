@@ -153,6 +153,7 @@ function ReviewsWithReply({ providerId }) {
   const { data, loading, refetch } = useFetch(
     () => api.get(`/provider/${providerId}/reviews`, { params: { limit: 20 } }),
     [providerId],
+    `reviews:${providerId}:all`,
   );
   const [replying, setReplying] = useState(null);
   const [text, setText] = useState("");
@@ -211,6 +212,7 @@ function MyPosts({ providerId }) {
   const { data, loading, setData } = useFetch(
     () => api.get("/posts", { params: { provider: providerId, limit: 20 } }),
     [providerId],
+    `posts:${providerId}`,
   );
   return (
     <div className="space-y-4">
@@ -368,7 +370,7 @@ export default function ProviderDashboard() {
   const [editOpen, setEditOpen] = useState(() => params.get("edit") === "1");
   const [toggling, setToggling] = useState(false);
 
-  const bookings = useFetch(() => api.get("/booking/provider"), []);
+  const bookings = useFetch(() => api.get("/booking/provider"), [], "provider-jobs");
 
   if (!profile) return <Spinner className="py-20" />;
 

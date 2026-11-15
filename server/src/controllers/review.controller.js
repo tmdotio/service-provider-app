@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Booking from "../models/booking.model.js";
 import Review from "../models/review.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
+import { cacheProviders, setCacheHeader, stableQueryKey } from "../services/cache.service.js";
 import { notify } from "../services/notification.service.js";
 import ApiError from "../utils/ApiError.js";
 import { getPagination, paginationMeta } from "../utils/pagination.js";
@@ -89,30 +90,38 @@ export const getProviderReviews = async (req, res) => {
     filter.rating = Number(req.query.rating);
   }
 
-  const [reviews, total, breakdownRaw] = await Promise.all([
-    Review.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("customer", "name avatar"),
-    Review.countDocuments(filter),
-    Review.aggregate([
-      { $match: { provider: providerId } },
-      { $group: { _id: "$rating", count: { $sum: 1 } } },
-    ]),
-  ]);
+  // Cached in Redis; cleared automatically when reviews change
+  const cache = {};
+  const data = await cacheProviders(
+    `reviews:${req.params.id}:${stableQueryKey(req.query)}`,
+    300,
+    async () => {
+      const [reviews, total, breakdownRaw] = await Promise.all([
+        Review.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("customer", "name avatar")
+          .lean(),
+        Review.countDocuments(filter),
+        Review.aggregate([
+          { $match: { provider: providerId } },
+          { $group: { _id: "$rating", count: { $sum: 1 } } },
+        ]),
+      ]);
 
-  const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const item of breakdownRaw) {
-    breakdown[item._id] = item.count;
-  }
+      const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      for (const item of breakdownRaw) {
+        breakdown[item._id] = item.count;
+      }
 
-  res.status(200).json({
-    success: true,
-    reviews,
-    breakdown,
-    pagination: paginationMeta(total, page, limit),
-  });
+      return { reviews, breakdown, pagination: paginationMeta(total, page, limit) };
+    },
+    cache,
+  );
+  setCacheHeader(res, cache);
+
+  res.status(200).json({ success: true, ...data });
 };
 
 /**

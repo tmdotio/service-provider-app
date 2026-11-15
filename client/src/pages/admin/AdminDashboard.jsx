@@ -18,7 +18,7 @@ const action = async (request, message, after) => {
 };
 
 function Overview() {
-  const { data, loading, error } = useFetch(() => api.get("/admin/dashboard-stats"), []);
+  const { data, loading, error } = useFetch(() => api.get("/admin/dashboard-stats"), [], "admin:stats");
   if (loading) return <Spinner />;
   if (error) return <ErrorBox message={error} />;
   const s = data.stats;
@@ -185,7 +185,7 @@ function Reports() {
 }
 
 function Categories() {
-  const { data, loading, refetch } = useFetch(() => api.get("/categories"), []);
+  const { data, loading, refetch } = useFetch(() => api.get("/categories"), [], "categories");
   const [name, setName] = useState("");
 
   const create = (e) => {

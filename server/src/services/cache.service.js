@@ -17,12 +17,18 @@ const k = (key) => `${PREFIX}${key}`;
  *   1. Redis mein dekho (look in Redis)
  *   2. Nahi mila to loader() se MongoDB se lao (else load from MongoDB)
  *   3. Redis mein save karo with expiry (TTL in seconds)
+ *
+ * Pass `meta` (an object) to learn where the data came from:
+ * meta.hit = true (Redis) or false (MongoDB).
  */
-export const getOrSetCache = async (key, ttlSeconds, loader) => {
+export const getOrSetCache = async (key, ttlSeconds, loader, meta = {}) => {
+  meta.hit = false;
+
   if (redisClient.isReady) {
     try {
       const cached = await redisClient.get(k(key));
       if (cached) {
+        meta.hit = true;
         return JSON.parse(cached);
       }
     } catch (error) {
@@ -85,9 +91,17 @@ export const bumpCacheVersion = async (name) => {
 };
 
 /** Cache something that depends on provider data (search, profiles). */
-export const cacheProviders = async (key, ttlSeconds, loader) => {
+export const cacheProviders = async (key, ttlSeconds, loader, meta) => {
   const version = await getCacheVersion("providers");
-  return getOrSetCache(`providers:v${version}:${key}`, ttlSeconds, loader);
+  return getOrSetCache(`providers:v${version}:${key}`, ttlSeconds, loader, meta);
+};
+
+/**
+ * Tell the client whether the response came from Redis.
+ * Open DevTools -> Network -> Response headers -> X-Cache: HIT / MISS
+ */
+export const setCacheHeader = (res, meta) => {
+  res.set("X-Cache", meta.hit ? "HIT" : "MISS");
 };
 
 /**

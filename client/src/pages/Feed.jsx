@@ -4,11 +4,19 @@ import { Link } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
 import { EmptyState, ErrorBox, PageHeader, PostSkeleton, SkeletonGrid } from "../components/ui";
-import useFetch from "../hooks/useFetch";
+import useFetch, { readCache, writeCache } from "../hooks/useFetch";
 
 export default function Feed() {
   const [page, setPage] = useState(1);
-  const [posts, setPosts] = useState([]);
+  // The list stays in memory between visits, so coming back is instant
+  // (cleared on login/logout because it includes "liked by me")
+  const [posts, setPostsState] = useState(() => readCache("feed") || []);
+  const setPosts = (update) =>
+    setPostsState((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      writeCache("feed", next);
+      return next;
+    });
 
   const { data, loading, error } = useFetch(async () => {
     const res = await api.get("/posts", { params: { page, limit: 10 } });
@@ -46,7 +54,9 @@ export default function Feed() {
         ))}
       </div>
 
-      {loading && <SkeletonGrid count={page === 1 ? 2 : 1} item={PostSkeleton} className="mt-4 space-y-4" />}
+      {loading && !(page === 1 && posts.length) && (
+        <SkeletonGrid count={page === 1 ? 2 : 1} item={PostSkeleton} className="mt-4 space-y-4" />
+      )}
 
       {!loading && posts.length === 0 && (
         <EmptyState icon={Images} title="No posts yet" text="Be the first to share a photo of great work." />

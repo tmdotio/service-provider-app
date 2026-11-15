@@ -30,11 +30,11 @@ export default function Home() {
   const [city, setCity] = useState("");
   const [filter, setFilter] = useState("all");
 
-  const categories = useFetch(() => api.get("/categories"), []);
-  const allProviders = useFetch(() => api.get("/provider", { params: { limit: 1 } }), []);
-  const availableProviders = useFetch(() => api.get("/provider", { params: { limit: 1, availability: "available" } }), []);
-  const topProviders = useFetch(() => api.get("/provider", { params: { ...filterParams[filter], limit: 4 } }), [filter]);
-  const posts = useFetch(() => api.get("/posts", { params: { limit: 2 } }), []);
+  const categories = useFetch(() => api.get("/categories"), [], "categories");
+  const allProviders = useFetch(() => api.get("/provider", { params: { limit: 1 } }), [], "home:all");
+  const availableProviders = useFetch(() => api.get("/provider", { params: { limit: 1, availability: "available" } }), [], "home:online");
+  const topProviders = useFetch(() => api.get("/provider", { params: { ...filterParams[filter], limit: 4 } }), [filter], `home:top:${filter}`);
+  const posts = useFetch(() => api.get("/posts", { params: { limit: 2 } }), [], "home:posts");
 
   const search = (e) => {
     e.preventDefault();
