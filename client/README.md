@@ -1,4 +1,4 @@
-# KaamWala — Frontend
+# Ustaad — Frontend
 
 React 19 + Vite + Tailwind CSS v4 + React Router + Redux Toolkit + Axios.
 

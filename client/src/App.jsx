@@ -1,10 +1,9 @@
 import { Toaster } from "react-hot-toast";
-import { Link, Route, Routes } from "react-router";
+import { Link, Navigate, Route, Routes } from "react-router";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import BecomeProvider from "./pages/BecomeProvider";
 import Feed from "./pages/Feed";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -13,15 +12,16 @@ import ProviderDashboard from "./pages/provider/ProviderDashboard";
 import ProviderProfile from "./pages/ProviderProfile";
 import Providers from "./pages/Providers";
 import Register from "./pages/Register";
-import { APP_NAME } from "./utils/format";
+import { DisplayTitle } from "./components/ui";
+import { APP_NAME, APP_TAGLINE } from "./utils/format";
 
 const YEAR = new Date().getFullYear();
 
 function NotFound() {
   return (
     <div className="mx-auto max-w-md px-4 py-24 text-center">
-      <p className="text-5xl font-bold text-brand-600">404</p>
-      <p className="mt-2 text-gray-600">This page does not exist.</p>
+      <DisplayTitle className="text-7xl">404</DisplayTitle>
+      <p className="mt-4 text-muted">This page does not exist.</p>
       <Link to="/" className="btn-primary mt-6">Go home</Link>
     </div>
   );
@@ -45,7 +45,6 @@ export default function App() {
           </Route>
           <Route element={<ProtectedRoute roles={["customer"]} />}>
             <Route path="/bookings" element={<MyBookings />} />
-            <Route path="/become-provider" element={<BecomeProvider />} />
           </Route>
           <Route element={<ProtectedRoute roles={["provider"]} />}>
             <Route path="/provider" element={<ProviderDashboard />} />
@@ -54,13 +53,25 @@ export default function App() {
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 
+          {/* Old link: applying is now a popup on the profile page */}
+          <Route path="/become-provider" element={<Navigate to="/account" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <footer className="border-t bg-white py-6 text-center text-sm text-gray-500">
-        © {YEAR} {APP_NAME} · Built with the MERN stack
+      <footer className="mt-10 border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-sm text-muted">
+          <span>
+            © {YEAR} <span className="font-semibold text-fg">{APP_NAME}</span> · {APP_TAGLINE}
+          </span>
+          <span>Built with the MERN stack</span>
+        </div>
       </footer>
-      <Toaster position="top-center" />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: "!rounded-full !bg-fg !text-bg !text-sm !font-semibold",
+        }}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { MongoMemoryReplSet } from "mongodb-memory-server";
 
 const replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 
-process.env.MONGO_URI = replSet.getUri("kaamwala-demo");
+process.env.MONGO_URI = replSet.getUri("ustaad-demo");
 process.env.PORT = process.env.PORT || "5051";
 process.env.NODE_ENV = "development";
 // Don't share the real Redis cache with demo data

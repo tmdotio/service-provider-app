@@ -1,54 +1,51 @@
-import { Briefcase, MapPin } from "lucide-react";
 import { Link } from "react-router";
-import { Avatar, Stars, StatusBadge } from "./ui";
+import { Avatar, NotchCard, RatingDots, StatusBadge, Tag } from "./ui";
 
+/** Provider card in the style of the "lead" cards in the reference. */
 export default function ProviderCard({ provider }) {
+  const url = `/providers/${provider._id}`;
+  const services = provider.categories?.map((c) => c.name) || [];
+
   return (
-    <Link
-      to={`/providers/${provider._id}`}
-      className="card flex flex-col gap-3 p-5 transition hover:border-brand-500 hover:shadow-md"
-    >
-      <div className="flex items-start gap-3">
-        <Avatar user={provider.user} size="h-12 w-12" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{provider.businessName}</p>
-          <p className="truncate text-sm text-gray-500">{provider.user?.name}</p>
+    <NotchCard to={url} cornerLabel={`Open ${provider.businessName}`} className="group">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-3 pr-12">
+          <Avatar user={provider.user} size="h-12 w-12" />
+          <StatusBadge status={provider.availabilityStatus} />
         </div>
-        <StatusBadge status={provider.availabilityStatus} />
-      </div>
 
-      <div className="flex items-center gap-2 text-sm">
-        <Stars value={provider.averageRating} />
-        <span className="text-gray-600">
-          {provider.averageRating?.toFixed(1) || "0.0"} ({provider.totalReviews})
-        </span>
-      </div>
+        <Link to={url} className="mt-5 block">
+          <h3 className="truncate text-xl font-bold transition group-hover:text-accent">{provider.businessName}</h3>
+          <p className="mt-0.5 truncate text-sm text-muted">
+            {services.slice(0, 2).join(" · ")} · {provider.user?.name}
+          </p>
+        </Link>
 
-      {provider.description && (
-        <p className="line-clamp-2 text-sm text-gray-600">{provider.description}</p>
-      )}
+        <div className="mt-auto grid grid-cols-2 gap-3 pt-6 text-xs">
+          <div>
+            <p className="mb-1.5 text-muted">Area</p>
+            <div className="flex flex-wrap gap-1">
+              <Tag>{provider.location?.city}</Tag>
+              <Tag>{provider.experienceYears} yrs</Tag>
+            </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <p className="mb-1.5 text-muted">
+              {provider.averageRating?.toFixed(1) || "0.0"} · {provider.totalReviews} review{provider.totalReviews === 1 ? "" : "s"}
+            </p>
+            <RatingDots value={provider.averageRating || 0} />
+          </div>
+        </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {provider.categories?.map((c) => (
-          <span key={c._id} className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700">
-            {c.name}
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-muted">
+          <span>
+            {provider.completedJobs} job{provider.completedJobs === 1 ? "" : "s"} done
           </span>
-        ))}
+          {provider.noShowCount > 0 && (
+            <span className="font-semibold text-rose-500">{provider.noShowCount} no-show</span>
+          )}
+        </div>
       </div>
-
-      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <MapPin className="h-3.5 w-3.5" />
-          {provider.location?.city}
-        </span>
-        <span className="flex items-center gap-1">
-          <Briefcase className="h-3.5 w-3.5" />
-          {provider.completedJobs} job{provider.completedJobs === 1 ? "" : "s"} · {provider.experienceYears} yrs
-        </span>
-        {provider.noShowCount > 0 && (
-          <span className="text-red-600">{provider.noShowCount} no-show</span>
-        )}
-      </div>
-    </Link>
+    </NotchCard>
   );
 }

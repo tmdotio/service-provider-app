@@ -1,4 +1,4 @@
-import { CalendarX, MapPin, Phone, Star } from "lucide-react";
+import { Bell, CalendarX, Images, LayoutGrid, MapPin, Pencil, Phone, Power, Star, Wrench } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
@@ -7,7 +7,20 @@ import api, { getErrorMessage } from "../../api/axios";
 import { ReasonModal } from "../../components/BookingActions";
 import CreatePostForm from "../../components/CreatePostForm";
 import PostCard from "../../components/PostCard";
-import { Avatar, EmptyState, ErrorBox, Modal, PageHeader, Spinner, Stars, StatusBadge } from "../../components/ui";
+import {
+  Avatar,
+  Chips,
+  EmptyState,
+  ErrorBox,
+  Modal,
+  NotchCard,
+  PageHeader,
+  SectionPill,
+  Spinner,
+  Stars,
+  Stat,
+  StatusBadge,
+} from "../../components/ui";
 import useAuth from "../../hooks/useAuth";
 import useFetch from "../../hooks/useFetch";
 import { fetchMe } from "../../store/authSlice";
@@ -38,54 +51,77 @@ function JobCard({ booking, onChanged }) {
   };
 
   const { customer } = booking;
+  const active = booking.status === "in_progress";
+  const darkBtn = "btn bg-accent-ink text-white hover:bg-black";
+  const lineBtn = "btn border border-accent-ink/25 text-accent-ink hover:bg-accent-ink/10";
 
   return (
-    <div className="card p-5">
-      <div className="flex items-start gap-3">
+    <NotchCard
+      highlight={active}
+      corner={customer?.phone ? <Phone className="h-[18px] w-[18px]" /> : <Bell className="h-[18px] w-[18px]" />}
+      onCornerClick={customer?.phone ? () => (window.location.href = `tel:${customer.phone}`) : undefined}
+      cornerLabel={`Call ${customer?.name}`}
+    >
+      <div className="flex items-center gap-3 pr-12">
         <Avatar user={customer} />
-        <div className="flex-1">
-          <p className="font-semibold">{customer?.name}</p>
-          <p className="text-sm text-gray-500">{booking.category?.name} · {timeAgo(booking.createdAt)}</p>
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{customer?.name}</p>
+          <p className={`text-xs ${active ? "opacity-70" : "text-muted"}`}>{timeAgo(booking.createdAt)}</p>
         </div>
-        <StatusBadge status={booking.status} />
       </div>
 
-      <p className="mt-3 text-sm text-gray-700">{booking.description}</p>
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+      <h3 className="mt-5 flex items-center gap-2 text-2xl font-bold">
+        <Wrench className={`h-5 w-5 ${active ? "" : "text-accent"}`} />
+        {booking.category?.name}
+      </h3>
+      <p className={`mt-1 line-clamp-3 text-sm ${active ? "opacity-80" : "text-muted"}`}>{booking.description}</p>
+      <div className={`mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm ${active ? "opacity-80" : "text-muted"}`}>
         <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{booking.serviceAddress}</span>
-        {booking.status === "in_progress" && customer?.phone && (
-          <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 font-medium text-brand-700">
+        {active && customer?.phone && (
+          <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 font-bold">
             <Phone className="h-4 w-4" />{customer.phone}
           </a>
         )}
       </div>
-      {booking.reason && <p className="mt-2 text-sm text-gray-500">Reason: {booking.reason}</p>}
+      {booking.reason && <p className="mt-2 text-sm text-muted">Reason: {booking.reason}</p>}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {booking.status === "pending" && (
-          <>
-            <button
-              className="btn-primary"
-              disabled={busy}
-              onClick={() => run(() => api.patch(`/booking/${booking._id}/respond`, { action: "accept" }), "Booking accepted. You are now busy.")}
-            >
-              Accept
-            </button>
-            <button className="btn-outline" disabled={busy} onClick={() => setModal("reject")}>Reject</button>
-          </>
-        )}
-        {booking.status === "in_progress" && (
-          <>
-            <button
-              className="btn-primary"
-              disabled={busy}
-              onClick={() => run(() => api.patch(`/booking/${booking._id}/complete`), "Job completed!")}
-            >
-              Mark as completed
-            </button>
-            <button className="btn-outline" disabled={busy} onClick={() => setModal("cancel")}>Cancel job</button>
-          </>
-        )}
+      <div className={`mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4 ${active ? "border-accent-ink/15" : "border-line"}`}>
+        <div>
+          <p className={`mb-1 text-xs ${active ? "opacity-70" : "text-muted"}`}>Status</p>
+          {active ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-ink/10 px-2.5 py-1 text-xs font-semibold">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-ink" /> In progress
+            </span>
+          ) : (
+            <StatusBadge status={booking.status} />
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {booking.status === "pending" && (
+            <>
+              <button className="btn-outline" disabled={busy} onClick={() => setModal("reject")}>Reject</button>
+              <button
+                className="btn-primary"
+                disabled={busy}
+                onClick={() => run(() => api.patch(`/booking/${booking._id}/respond`, { action: "accept" }), "Booking accepted. You are now busy.")}
+              >
+                Accept
+              </button>
+            </>
+          )}
+          {active && (
+            <>
+              <button className={lineBtn} disabled={busy} onClick={() => setModal("cancel")}>Cancel</button>
+              <button
+                className={darkBtn}
+                disabled={busy}
+                onClick={() => run(() => api.patch(`/booking/${booking._id}/complete`), "Job completed!")}
+              >
+                Mark done
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <ReasonModal
@@ -107,7 +143,7 @@ function JobCard({ booking, onChanged }) {
         onClose={() => setModal(null)}
         onConfirm={(reason) => run(() => api.patch(`/booking/${booking._id}/cancel`, { reason }), "Job cancelled")}
       />
-    </div>
+    </NotchCard>
   );
 }
 
@@ -143,14 +179,14 @@ function ReviewsWithReply({ providerId }) {
             <Avatar user={r.customer} size="h-9 w-9" />
             <div className="flex-1">
               <p className="text-sm font-medium">{r.customer?.name}</p>
-              <p className="text-xs text-gray-400">{timeAgo(r.createdAt)}</p>
+              <p className="text-xs text-muted">{timeAgo(r.createdAt)}</p>
             </div>
             <Stars value={r.rating} />
           </div>
-          {r.comment && <p className="mt-2 text-sm text-gray-700">{r.comment}</p>}
+          {r.comment && <p className="mt-2 text-sm text-fg/80">{r.comment}</p>}
           {r.providerReply?.text ? (
-            <p className="mt-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-              <span className="text-xs font-medium text-gray-500">Your reply: </span>
+            <p className="mt-2 rounded-2xl bg-surface-2 p-3 text-sm text-fg/80">
+              <span className="text-xs font-medium text-muted">Your reply: </span>
               {r.providerReply.text}
             </p>
           ) : replying === r._id ? (
@@ -159,7 +195,7 @@ function ReviewsWithReply({ providerId }) {
               <button className="btn-primary">Reply</button>
             </form>
           ) : (
-            <button onClick={() => setReplying(r._id)} className="mt-2 text-sm font-medium text-brand-700 hover:underline">
+            <button onClick={() => setReplying(r._id)} className="mt-2 text-sm font-medium text-accent hover:underline">
               Reply
             </button>
           )}
@@ -291,87 +327,116 @@ export default function ProviderDashboard() {
   const list = all.filter((b) => TABS[tab].includes(b.status));
   const status = profile.availabilityStatus;
 
+  const sections = [
+    ["jobs", "Jobs", LayoutGrid],
+    ["posts", "My work", Images],
+    ["reviews", "Reviews", Star],
+  ];
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-10">
       <PageHeader
-        title={profile.businessName}
-        subtitle={<Link to={`/providers/${profile._id}`} className="text-brand-700 hover:underline">View public profile</Link>}
-        action={<button className="btn-outline" onClick={() => setEditOpen(true)}>Edit profile</button>}
-      />
+        title="Workspace"
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-fg">{profile.businessName}</span>·
+            <Link to={`/providers/${profile._id}`} className="text-accent hover:underline">View public profile</Link>
+          </span>
+        }
+      >
+        <div className="flex flex-wrap gap-x-8 gap-y-3">
+          <Stat value={profile.averageRating?.toFixed(1)} label="Rating" badge={`${profile.totalReviews}★`} />
+          <Stat value={profile.completedJobs} label="Jobs" badge="done" tone="green" />
+          <Stat value={profile.noShowCount} label="No-show" badge={profile.noShowCount ? "!" : "0"} tone="red" />
+        </div>
+      </PageHeader>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
-        <div className="card p-4 sm:col-span-2">
-          <p className="text-sm text-gray-500">Status</p>
-          <div className="mt-2 flex items-center gap-3">
-            <StatusBadge status={status} />
-            {status === "busy" ? (
-              <span className="text-sm text-gray-500">On a job — finish it to get new bookings</span>
-            ) : (
-              <button
-                className={status === "available" ? "btn-outline" : "btn-primary"}
-                disabled={toggling}
-                onClick={() => setAvailability(status === "available" ? "offline" : "available")}
-              >
-                {status === "available" ? "Go offline" : "Go online"}
-              </button>
-            )}
-          </div>
+      {/* Status bar */}
+      <div className="glass mb-8 flex flex-wrap items-center justify-between gap-3 rounded-full p-2 pl-5">
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-muted">Your status</span>
+          <StatusBadge status={status} />
+          {status === "busy" && <span className="hidden text-muted sm:inline">On a job — finish it to get new requests</span>}
         </div>
-        <div className="card p-4">
-          <p className="text-sm text-gray-500">Rating</p>
-          <p className="mt-1 text-2xl font-bold">{profile.averageRating?.toFixed(1)} <span className="text-sm font-normal text-gray-500">({profile.totalReviews})</span></p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-gray-500">Jobs done</p>
-          <p className="mt-1 text-2xl font-bold">{profile.completedJobs}</p>
-          {profile.noShowCount > 0 && <p className="text-xs text-red-600">{profile.noShowCount} no-show</p>}
-        </div>
-      </div>
-
-      <div className="mb-6 flex gap-2">
-        {[["jobs", "Jobs"], ["posts", "My work posts"], ["reviews", "Reviews"]].map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setSection(key)}
-            className={`btn ${section === key ? "bg-gray-900 text-white" : "border border-gray-300 bg-white text-gray-700"}`}
-          >
-            {label}
+        <div className="flex gap-2">
+          <button className="btn-ghost" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-4 w-4" /> Edit profile
           </button>
-        ))}
+          {status !== "busy" && (
+            <button
+              className={status === "available" ? "btn-outline" : "btn-primary"}
+              disabled={toggling}
+              onClick={() => setAvailability(status === "available" ? "offline" : "available")}
+            >
+              <Power className="h-4 w-4" />
+              {status === "available" ? "Go offline" : "Go online"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {section === "jobs" && (
-        <>
-          <div className="mb-4 flex gap-2 border-b">
-            {[["requests", "New requests"], ["active", "Active"], ["history", "History"]].map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-gray-500"}`}
-              >
-                {label} ({all.filter((b) => TABS[key].includes(b.status)).length})
-              </button>
-            ))}
-          </div>
-          <ErrorBox message={bookings.error} />
-          {bookings.loading && !bookings.data ? (
-            <Spinner />
-          ) : list.length === 0 ? (
-            <EmptyState
-              icon={CalendarX}
-              title="Nothing here"
-              text={tab === "requests" && status === "offline" ? "Go online to receive booking requests." : undefined}
-            />
-          ) : (
-            <div className="space-y-4">
-              {list.map((b) => <JobCard key={b._id} booking={b} onChanged={reload} />)}
-            </div>
-          )}
-        </>
-      )}
+      <div className="flex gap-6">
+        {/* Side rail of round icons, like the reference */}
+        <nav className="sticky top-28 hidden h-fit flex-col gap-3 lg:flex" aria-label="Dashboard sections">
+          {sections.map(([key, label, Icon]) => (
+            <button
+              key={key}
+              onClick={() => setSection(key)}
+              className={`icon-btn ${section === key ? "border-accent text-accent" : ""}`}
+              aria-label={label}
+              aria-current={section === key}
+              title={label}
+            >
+              <Icon className="h-[18px] w-[18px]" />
+            </button>
+          ))}
+        </nav>
 
-      {section === "posts" && <MyPosts providerId={profile._id} />}
-      {section === "reviews" && <ReviewsWithReply providerId={profile._id} />}
+        <div className="min-w-0 flex-1">
+          <Chips
+            className="mb-6 lg:hidden"
+            options={sections.map(([key, label]) => [key, label])}
+            value={section}
+            onChange={setSection}
+          />
+
+          {section === "jobs" && (
+            <>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                <SectionPill count={list.length}>
+                  {{ requests: "New requests", active: "Active job", history: "History" }[tab]}
+                </SectionPill>
+                <Chips
+                  options={[
+                    ["requests", `New (${all.filter((b) => TABS.requests.includes(b.status)).length})`],
+                    ["active", `Active (${all.filter((b) => TABS.active.includes(b.status)).length})`],
+                    ["history", "History"],
+                  ]}
+                  value={tab}
+                  onChange={setTab}
+                />
+              </div>
+              <ErrorBox message={bookings.error} />
+              {bookings.loading && !bookings.data ? (
+                <Spinner />
+              ) : list.length === 0 ? (
+                <EmptyState
+                  icon={CalendarX}
+                  title="Nothing here"
+                  text={tab === "requests" && status === "offline" ? "Go online to receive booking requests." : undefined}
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {list.map((b) => <JobCard key={b._id} booking={b} onChanged={reload} />)}
+                </div>
+              )}
+            </>
+          )}
+
+          {section === "posts" && <MyPosts providerId={profile._id} />}
+          {section === "reviews" && <ReviewsWithReply providerId={profile._id} />}
+        </div>
+      </div>
 
       {editOpen && (
         <EditProfileModal

@@ -62,19 +62,19 @@ function Comments({ post, onCountChange }) {
           </button>
         </form>
       )}
-      {comments?.length === 0 && <p className="text-sm text-gray-500">No comments yet</p>}
+      {comments?.length === 0 && <p className="text-sm text-muted">No comments yet</p>}
       {comments?.map((c) => (
         <div key={c._id} className="flex gap-2">
           <Avatar user={c.author} size="h-8 w-8" />
-          <div className="flex-1 rounded-lg bg-gray-100 px-3 py-2">
+          <div className="flex-1 rounded-2xl bg-surface-2 px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{c.author?.name}</span>
-              <span className="text-xs text-gray-400">{timeAgo(c.createdAt)}</span>
+              <span className="text-xs text-muted">{timeAgo(c.createdAt)}</span>
             </div>
-            <p className="text-sm text-gray-700">{c.text}</p>
+            <p className="text-sm text-fg/80">{c.text}</p>
           </div>
           {user && (c.author?._id === user._id || isPostAuthor || isAdmin) && (
-            <button onClick={() => remove(c._id)} className="self-start p-1 text-gray-400 hover:text-red-600" aria-label="Delete comment">
+            <button onClick={() => remove(c._id)} className="self-start p-1 text-muted hover:text-rose-500" aria-label="Delete comment">
               <Trash2 className="h-4 w-4" />
             </button>
           )}
@@ -146,32 +146,32 @@ export default function PostCard({ post: initialPost, onDeleted }) {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-semibold">{post.author?.name}</span>
             {post.type === "showcase" ? (
-              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700">Provider's work</span>
+              <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">Provider's work</span>
             ) : (
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">Customer experience</span>
+              <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs text-sky-600 dark:text-sky-300">Customer experience</span>
             )}
             {post.isVerifiedCustomer && (
-              <span className="flex items-center gap-1 text-xs text-green-700">
+              <span className="flex items-center gap-1 text-xs text-lime-600 dark:text-lime-400">
                 <BadgeCheck className="h-3.5 w-3.5" /> Verified customer
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted">
             about{" "}
-            <Link to={`/providers/${post.provider?._id}`} className="font-medium text-brand-700 hover:underline">
+            <Link to={`/providers/${post.provider?._id}`} className="font-medium text-accent hover:underline">
               {post.provider?.businessName}
             </Link>{" "}
             · {timeAgo(post.createdAt)}
           </p>
         </div>
         {(isAuthor || isAdmin) && (
-          <button onClick={remove} className="p-1 text-gray-400 hover:text-red-600" aria-label="Delete post">
+          <button onClick={remove} className="p-1 text-muted hover:text-rose-500" aria-label="Delete post">
             <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <p className="whitespace-pre-line px-4 pb-3 text-sm text-gray-800">{post.text}</p>
+      <p className="whitespace-pre-line px-4 pb-3 text-sm text-fg">{post.text}</p>
 
       {images.length > 0 && (
         <div className={`grid gap-0.5 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -195,7 +195,7 @@ export default function PostCard({ post: initialPost, onDeleted }) {
           aria-pressed={post.likedByMe}
           aria-label={`${post.likedByMe ? "Unlike" : "Like"} (${post.likesCount} likes)`}
         >
-          <Heart className={`h-4 w-4 ${post.likedByMe ? "fill-red-500 text-red-500" : ""}`} />
+          <Heart className={`h-4 w-4 ${post.likedByMe ? "fill-red-500 text-rose-500" : ""}`} />
           {post.likesCount}
         </button>
         <button
@@ -208,7 +208,7 @@ export default function PostCard({ post: initialPost, onDeleted }) {
           {post.commentsCount}
         </button>
         {user && !isAuthor && (
-          <button onClick={() => setReportOpen(true)} className="btn-ghost ml-auto text-gray-400" aria-label="Report post">
+          <button onClick={() => setReportOpen(true)} className="btn-ghost ml-auto text-muted" aria-label="Report post">
             <Flag className="h-4 w-4" />
           </button>
         )}

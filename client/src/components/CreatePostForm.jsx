@@ -79,7 +79,7 @@ export default function CreatePostForm({ providerId, placeholder, onCreated }) {
         <div className="grid grid-cols-4 gap-2">
           {previews.map((p, i) => (
             <div key={p.url} className="relative aspect-square">
-              <img src={p.url} alt="" className="h-full w-full rounded-lg object-cover" />
+              <img src={p.url} alt="" className="h-full w-full rounded-2xl object-cover" />
               <button
                 type="button"
                 onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
@@ -105,7 +105,7 @@ export default function CreatePostForm({ providerId, placeholder, onCreated }) {
             onChange={addFiles}
           />
         </label>
-        <span className="hidden text-xs text-gray-500 sm:block">
+        <span className="hidden text-xs text-muted sm:block">
           {files.length}/{MAX_IMAGES} · max {MAX_IMAGE_MB} MB each
         </span>
         <button className="btn-primary" disabled={saving}>

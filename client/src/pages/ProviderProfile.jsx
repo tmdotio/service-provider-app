@@ -1,4 +1,4 @@
-import { Briefcase, CalendarCheck, Images, MapPin, MessageSquareQuote, UserX } from "lucide-react";
+import { Images, MapPin, MessageSquareQuote, UserX } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useParams } from "react-router";
@@ -7,12 +7,14 @@ import CreatePostForm from "../components/CreatePostForm";
 import PostCard from "../components/PostCard";
 import {
   Avatar,
+  Chips,
   EmptyState,
   ErrorBox,
   Modal,
   Pagination,
   Spinner,
   Stars,
+  Stat,
   StatusBadge,
 } from "../components/ui";
 import useAuth from "../hooks/useAuth";
@@ -65,7 +67,7 @@ function BookingModal({ provider, open, onClose }) {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-          <p className="mt-1 text-xs text-gray-500">At least 10 characters</p>
+          <p className="mt-1 text-xs text-muted">At least 10 characters</p>
         </div>
         <div>
           <label className="label" htmlFor="address">Address</label>
@@ -108,11 +110,11 @@ function Reviews({ providerId }) {
           const count = data.breakdown[n] || 0;
           return (
             <div key={n} className="flex items-center gap-3 text-sm">
-              <span className="w-8 text-gray-600">{n} ★</span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-                <div className="h-full bg-amber-400" style={{ width: `${(count / total) * 100}%` }} />
+              <span className="w-8 text-muted">{n} ★</span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                <div className="h-full bg-accent" style={{ width: `${(count / total) * 100}%` }} />
               </div>
-              <span className="w-6 text-right text-gray-500">{count}</span>
+              <span className="w-6 text-right text-muted">{count}</span>
             </div>
           );
         })}
@@ -124,15 +126,15 @@ function Reviews({ providerId }) {
             <Avatar user={r.customer} size="h-9 w-9" />
             <div className="flex-1">
               <p className="text-sm font-medium">{r.customer?.name}</p>
-              <p className="text-xs text-gray-400">{timeAgo(r.createdAt)}</p>
+              <p className="text-xs text-muted">{timeAgo(r.createdAt)}</p>
             </div>
             <Stars value={r.rating} />
           </div>
-          {r.comment && <p className="mt-3 text-sm text-gray-700">{r.comment}</p>}
+          {r.comment && <p className="mt-3 text-sm text-fg/80">{r.comment}</p>}
           {r.providerReply?.text && (
-            <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
-              <p className="text-xs font-medium text-gray-500">Reply from provider</p>
-              <p className="text-gray-700">{r.providerReply.text}</p>
+            <div className="mt-3 rounded-2xl bg-surface-2 p-3 text-sm">
+              <p className="text-xs font-medium text-muted">Reply from provider</p>
+              <p className="text-fg/80">{r.providerReply.text}</p>
             </div>
           )}
         </div>
@@ -161,8 +163,8 @@ function Posts({ provider }) {
           onCreated={(post) => setData((d) => ({ ...d, posts: [post, ...(d?.posts || [])] }))}
         />
       ) : (
-        <p className="text-sm text-gray-500">
-          <Link to="/login" className="text-brand-700 hover:underline">Log in</Link> to share photos of their work.
+        <p className="text-sm text-muted">
+          <Link to="/login" className="text-accent hover:underline">Log in</Link> to share photos of their work.
         </p>
       )}
 
@@ -210,86 +212,69 @@ export default function ProviderProfile() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-10">
       <ErrorBox message={error} />
 
-      <div className="card p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <Avatar user={provider.user} size="h-20 w-20" />
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold">{provider.businessName}</h1>
-              <StatusBadge status={provider.availabilityStatus} />
+      <div className="card overflow-hidden">
+        <div className="relative h-32 bg-accent-gradient sm:h-40">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgb(255_255_255/0.35),transparent_45%)]" />
+        </div>
+        <div className="px-6 pb-6">
+          <div className="relative -mt-12 flex flex-wrap items-end justify-between gap-4">
+            <div className="rounded-full bg-surface p-1.5">
+              <Avatar user={provider.user} size="h-24 w-24" />
             </div>
-            <p className="text-gray-500">{provider.user?.name}</p>
-
-            <div className="mt-2 flex items-center gap-2 text-sm">
-              <Stars value={provider.averageRating} />
-              <span>{provider.averageRating.toFixed(1)} · {provider.totalReviews} reviews</span>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-600">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" />
-                {provider.location.city}, {provider.location.province}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Briefcase className="h-4 w-4" />
-                {provider.experienceYears} years experience
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CalendarCheck className="h-4 w-4" />
-                {provider.completedJobs} jobs completed
-              </span>
-              {provider.noShowCount > 0 && (
-                <span className="font-medium text-red-600">{provider.noShowCount} reported no-show</span>
-              )}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {provider.categories.map((c) => (
-                <span key={c._id} className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs">{c.name}</span>
-              ))}
-            </div>
+            {(!user || isCustomer) && (
+              <div className="flex items-center gap-3">
+                {!canBook && (
+                  <span className="text-sm text-muted">
+                    {provider.availabilityStatus === "busy" ? "On a job right now" : "Offline at the moment"}
+                  </span>
+                )}
+                <button className="btn-primary h-12 px-7" onClick={onBook} disabled={user && !canBook}>
+                  Book now
+                </button>
+              </div>
+            )}
           </div>
 
-          {(!user || isCustomer) && (
-            <div className="sm:text-right">
-              <button className="btn-primary w-full sm:w-auto" onClick={onBook} disabled={user && !canBook}>
-                Book now
-              </button>
-              {!canBook && (
-                <p className="mt-2 text-xs text-gray-500">
-                  {provider.availabilityStatus === "busy" ? "On a job right now" : "Offline at the moment"}
-                </p>
-              )}
-            </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{provider.businessName}</h1>
+            <StatusBadge status={provider.availabilityStatus} />
+          </div>
+          <p className="mt-1 text-muted">by {provider.user?.name}</p>
+
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {provider.categories.map((c) => (
+              <span key={c._id} className="chip">{c.name}</span>
+            ))}
+            <span className="chip"><MapPin className="h-4 w-4 text-muted" />{provider.location.city}, {provider.location.province}</span>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-6 border-t border-line pt-6 sm:grid-cols-4">
+            <Stat value={provider.averageRating.toFixed(1)} label="Rating" badge={`${provider.totalReviews}★`} />
+            <Stat value={provider.completedJobs} label="Jobs done" tone="green" badge="✓" />
+            <Stat value={provider.experienceYears} label="Years" />
+            <Stat value={provider.noShowCount} label="No-shows" tone="red" badge={provider.noShowCount ? "!" : "0"} />
+          </div>
+
+          {provider.description && (
+            <p className="mt-6 whitespace-pre-line text-fg/80">{provider.description}</p>
           )}
         </div>
-
-        {provider.description && (
-          <p className="mt-5 whitespace-pre-line border-t pt-5 text-gray-700">{provider.description}</p>
-        )}
       </div>
 
-      <div className="mt-6 flex gap-2 border-b">
-        {[
+      <Chips
+        className="mt-8"
+        options={[
           ["reviews", `Reviews (${provider.totalReviews})`],
           ["posts", `Work photos (${postsCount})`],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-              tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
-      <div className="mt-6">
+      <div className="mt-5">
         {tab === "reviews" ? <Reviews providerId={provider._id} /> : <Posts provider={provider} />}
       </div>
 

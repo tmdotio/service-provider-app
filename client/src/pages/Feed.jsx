@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
-import { EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
+import { Chips, EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 
 const FILTERS = [
@@ -39,25 +39,15 @@ export default function Feed() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <PageHeader
-        title="Work feed"
+        title="Work board"
         subtitle="Real photos of jobs done by providers, shared by them and their customers."
       />
 
-      <div className="mb-4 flex gap-2 overflow-x-auto">
-        {FILTERS.map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => changeType(value)}
-            className={`btn whitespace-nowrap ${type === value ? "bg-brand-600 text-white" : "border border-gray-300 bg-white text-gray-700"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Chips className="mb-5" options={FILTERS} value={type} onChange={changeType} />
 
-      <p className="mb-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-700">
+      <p className="mb-6 rounded-[20px] border border-accent/30 bg-accent/10 px-5 py-3.5 text-sm">
         Want to post? Open a provider's profile and share photos of their work.{" "}
-        <Link to="/providers" className="font-medium underline">Find a provider</Link>
+        <Link to="/providers" className="font-semibold text-accent underline underline-offset-2">Find a pro</Link>
       </p>
 
       <ErrorBox message={error} />

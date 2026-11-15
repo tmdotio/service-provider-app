@@ -1,22 +1,39 @@
-import { CheckCircle2, Search, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, MapPin, Search, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
 import ProviderCard from "../components/ProviderCard";
-import { Spinner } from "../components/ui";
+import { Chips, DisplayTitle, SectionPill, Spinner, Stat } from "../components/ui";
 import useFetch from "../hooks/useFetch";
+import { APP_TAGLINE } from "../utils/format";
+
+const PRO_FILTERS = [
+  ["all", "All"],
+  ["available", "🟢 Available now"],
+  ["rating", "Top rated"],
+  ["jobs", "Most jobs"],
+  ["experience", "Most experienced"],
+];
+
+const filterParams = {
+  all: { sort: "rating" },
+  available: { availability: "available", sort: "rating" },
+  rating: { sort: "rating", minRating: 4 },
+  jobs: { sort: "jobs" },
+  experience: { sort: "experience" },
+};
 
 export default function Home() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
+  const [filter, setFilter] = useState("all");
 
   const categories = useFetch(() => api.get("/categories"), []);
-  const topProviders = useFetch(
-    () => api.get("/provider", { params: { sort: "rating", limit: 3 } }),
-    [],
-  );
+  const allPros = useFetch(() => api.get("/provider", { params: { limit: 1 } }), []);
+  const availablePros = useFetch(() => api.get("/provider", { params: { limit: 1, availability: "available" } }), []);
+  const pros = useFetch(() => api.get("/provider", { params: { ...filterParams[filter], limit: 4 } }), [filter]);
   const posts = useFetch(() => api.get("/posts", { params: { limit: 2 } }), []);
 
   const search = (e) => {
@@ -27,92 +44,109 @@ export default function Home() {
     navigate(`/providers?${params}`);
   };
 
-  return (
-    <div>
-      <section className="bg-gradient-to-br from-brand-700 to-brand-500 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
-          <h1 className="max-w-2xl text-3xl font-bold leading-tight sm:text-5xl">
-            Trusted plumbers, electricians and more — near you.
-          </h1>
-          <p className="mt-4 max-w-xl text-brand-50">
-            See real reviews and photos of their work, then book in a minute.
-          </p>
+  const proTotal = allPros.data?.pagination.total ?? "–";
 
-          <form onSubmit={search} className="mt-8 flex max-w-2xl flex-col gap-2 rounded-xl bg-white p-2 sm:flex-row">
+  return (
+    <div className="mx-auto max-w-6xl px-4 pb-16">
+      {/* Hero */}
+      <section className="pt-10 sm:pt-16">
+        <div className="flex flex-wrap items-end justify-between gap-8">
+          <div>
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted">
+              <ShieldCheck className="h-3.5 w-3.5 text-accent" /> {APP_TAGLINE}
+            </p>
+            <DisplayTitle className="text-[clamp(2.75rem,11vw,6rem)]">Find a pro</DisplayTitle>
+            <p className="mt-4 max-w-md text-muted">
+              Plumbers, electricians, carpenters and more. Real reviews, real photos of their work, and no-shows shown in public.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-x-8 gap-y-4 sm:gap-x-10">
+            <Stat value={proTotal} label="Pros" badge="verified" />
+            <Stat value={availablePros.data?.pagination.total ?? "–"} label="Online" badge="now" tone="green" />
+            <Stat value={categories.data?.count ?? "–"} label="Services" />
+          </div>
+        </div>
+
+        {/* Search capsule, like the "Your Schedule" bar in the reference */}
+        <form onSubmit={search} className="glass mt-10 flex flex-col gap-2 rounded-[32px] p-2 shadow-xl shadow-black/5 sm:flex-row sm:items-center sm:rounded-full">
+          <label className="flex flex-1 items-center gap-3 rounded-full bg-surface px-5 py-3">
+            <Search className="h-5 w-5 shrink-0 text-muted" />
             <input
-              className="input border-0 text-gray-900 focus:ring-0"
-              placeholder="What do you need? e.g. AC repair"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+              placeholder="What do you need? e.g. AC repair, leaking tap"
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              aria-label="Service or problem"
             />
+          </label>
+          <label className="flex items-center gap-3 rounded-full bg-surface px-5 py-3 sm:w-56">
+            <MapPin className="h-5 w-5 shrink-0 text-muted" />
             <input
-              className="input border-0 text-gray-900 focus:ring-0 sm:max-w-44"
-              placeholder="City e.g. Lahore"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+              placeholder="City"
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              aria-label="City"
             />
-            <button className="btn-primary px-6">
-              <Search className="h-4 w-4" /> Search
-            </button>
-          </form>
+          </label>
+          <button className="btn bg-accent-gradient h-12 px-7 text-accent-ink shadow-lg shadow-orange-500/20 hover:brightness-105">
+            Search <ArrowRight className="h-4 w-4" />
+          </button>
+        </form>
+      </section>
 
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-brand-50">
-            <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4" /> Admin-verified providers</span>
-            <span className="flex items-center gap-1.5"><Star className="h-4 w-4" /> Reviews from real bookings</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4" /> No-shows are shown publicly</span>
+      {/* Pros */}
+      <section className="mt-16">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <SectionPill count={proTotal}>Top pros</SectionPill>
+          <Chips options={PRO_FILTERS} value={filter} onChange={setFilter} />
+        </div>
+        {pros.loading && !pros.data ? (
+          <Spinner />
+        ) : (
+          <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-4 ${pros.loading ? "opacity-60" : ""}`}>
+            {pros.data?.providers.map((p) => <ProviderCard key={p._id} provider={p} />)}
+            {pros.data?.providers.length === 0 && (
+              <p className="col-span-full py-10 text-center text-muted">No pros match this filter yet.</p>
+            )}
           </div>
+        )}
+        <div className="mt-6 text-center">
+          <Link to="/providers" className="btn-outline">
+            See all pros <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-12 px-4 py-12">
-        <section>
-          <h2 className="mb-4 text-xl font-bold">Browse by service</h2>
-          {categories.loading ? (
-            <Spinner />
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {categories.data?.categories.map((c) => (
-                <Link
-                  key={c._id}
-                  to={`/providers?category=${c._id}`}
-                  className="card p-4 transition hover:border-brand-500 hover:shadow-md"
-                >
-                  <p className="font-medium">{c.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {c.providersCount} provider{c.providersCount === 1 ? "" : "s"}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+      {/* Services */}
+      <section className="mt-16">
+        <div className="mb-5">
+          <SectionPill count={categories.data?.count}>Services</SectionPill>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {categories.data?.categories.map((c) => (
+            <Link key={c._id} to={`/providers?category=${c._id}`} className="chip py-2.5 pl-4 pr-2">
+              {c.name}
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted">{c.providersCount}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold">Top rated providers</h2>
-            <Link to="/providers" className="text-sm font-medium text-brand-700 hover:underline">See all</Link>
+      {/* Work */}
+      {posts.data?.posts.length > 0 && (
+        <section className="mt-16">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <SectionPill>Latest work</SectionPill>
+            <Link to="/feed" className="btn-ghost">
+              Open feed <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          {topProviders.loading ? (
-            <Spinner />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {topProviders.data?.providers.map((p) => <ProviderCard key={p._id} provider={p} />)}
-            </div>
-          )}
+          <div className="grid gap-4 md:grid-cols-2">
+            {posts.data.posts.map((p) => <PostCard key={p._id} post={p} />)}
+          </div>
         </section>
-
-        {posts.data?.posts.length > 0 && (
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold">Latest work</h2>
-              <Link to="/feed" className="text-sm font-medium text-brand-700 hover:underline">Open feed</Link>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {posts.data.posts.map((p) => <PostCard key={p._id} post={p} />)}
-            </div>
-          </section>
-        )}
-      </div>
+      )}
     </div>
   );
 }

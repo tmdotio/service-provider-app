@@ -3,6 +3,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { Link, Navigate, useNavigate } from "react-router";
+import AuthLayout from "../components/AuthLayout";
 import { ErrorBox } from "../components/ui";
 import useAuth from "../hooks/useAuth";
 import { register } from "../store/authSlice";
@@ -40,14 +41,11 @@ export default function Register() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
-      <div className="card p-8">
-        <h1 className="text-2xl font-bold">Create an account</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Book trusted providers. Want to offer services? Sign up first, then apply as a provider.
-        </p>
-
-        <form onSubmit={submit} className="mt-6 space-y-4">
+    <AuthLayout
+      title="Create your account"
+      subtitle="Book trusted pros. Offer a service? Sign up, then tap “Become a provider” on your profile."
+    >
+        <form onSubmit={submit} className="space-y-4">
           <ErrorBox message={error} />
           <div>
             <label className="label" htmlFor="name">Full name</label>
@@ -64,19 +62,18 @@ export default function Register() {
           <div>
             <label className="label" htmlFor="password">Password</label>
             <input id="password" type="password" className="input" autoComplete="new-password" required minLength={8} value={form.password} onChange={set("password")} />
-            <p className="mt-1 text-xs text-gray-500">At least 8 characters</p>
+            <p className="mt-1 text-xs text-muted">At least 8 characters</p>
           </div>
-          <button className="btn-primary w-full" disabled={loading}>
+          <button className="btn-primary h-12 w-full" disabled={loading}>
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Sign up
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-muted">
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-brand-700 hover:underline">Log in</Link>
+          <Link to="/login" className="font-medium text-accent hover:underline">Log in</Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

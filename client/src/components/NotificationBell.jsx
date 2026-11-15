@@ -13,7 +13,7 @@ const linkFor = (n, role) => {
     return role === "provider" ? "/provider" : "/bookings";
   }
   if (n.type.startsWith("post_")) return "/feed";
-  if (n.type.startsWith("provider_")) return role === "provider" ? "/provider" : "/become-provider";
+  if (n.type.startsWith("provider_")) return role === "provider" ? "/provider" : "/account";
   return "/";
 };
 
@@ -74,41 +74,44 @@ export default function NotificationBell() {
           setOpen((o) => !o);
           if (!open) load();
         }}
-        className="btn-ghost relative p-2"
+        className="icon-btn relative h-10 w-10"
         aria-label={`Notifications${unread ? ` (${unread} unread)` : ""}`}
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-[18px] w-[18px]" />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink ring-2 ring-surface">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="card absolute right-0 z-40 mt-2 w-80 overflow-hidden">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="font-semibold">Notifications</span>
+        <div className="glass absolute right-0 z-40 mt-3 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[24px] shadow-2xl">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <span className="font-bold">Notifications</span>
             {unread > 0 && (
-              <button onClick={markAllRead} className="text-xs text-brand-600 hover:underline">
+              <button onClick={markAllRead} className="text-xs font-semibold text-accent hover:underline">
                 Mark all as read
               </button>
             )}
           </div>
           <ul className="max-h-96 overflow-y-auto">
             {items.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-gray-500">No notifications yet</li>
+              <li className="px-4 py-10 text-center text-sm text-muted">No notifications yet</li>
             )}
             {items.map((n) => (
               <li key={n._id}>
                 <button
                   onClick={() => openItem(n)}
-                  className={`w-full border-b px-4 py-3 text-left text-sm hover:bg-gray-50 ${
-                    n.isRead ? "text-gray-600" : "bg-brand-50/60 font-medium text-gray-900"
+                  className={`flex w-full gap-3 border-b border-line px-5 py-3.5 text-left text-sm transition hover:bg-surface-2 ${
+                    n.isRead ? "text-muted" : "font-semibold text-fg"
                   }`}
                 >
-                  <p>{n.message}</p>
-                  <p className="mt-1 text-xs font-normal text-gray-400">{timeAgo(n.createdAt)}</p>
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.isRead ? "bg-transparent" : "bg-accent"}`} />
+                  <span>
+                    <span className="block">{n.message}</span>
+                    <span className="mt-1 block text-xs font-normal text-muted">{timeAgo(n.createdAt)}</span>
+                  </span>
                 </button>
               </li>
             ))}

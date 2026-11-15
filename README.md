@@ -1,4 +1,4 @@
-# KaamWala — Service Provider App (MERN)
+# Ustaad — Service Provider App (MERN)
 
 A local services marketplace API (plumbers, electricians, carpenters...). Customers find a provider, book them, and track the job. Afterwards they review the provider and post photos of the work. Admins approve providers and moderate posts.
 
@@ -62,6 +62,10 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 ## Frontend (React)
 
 `client/`: React 19 · Vite · Tailwind CSS v4 · React Router · Redux Toolkit · Axios
+
+**Design:** dark and light themes with a switch (it follows the computer's setting the first time), one warm orange accent, a wide display headline font (Archivo) with Urbanist for text, frosted-glass navbar and popups, and cards with a round cut-out corner holding the action button (done with a CSS mask, so it works on any background). Every colour is a CSS variable, so the whole theme changes in one place.
+
+- **Become a provider:** customers open **My profile** and tap **Become a provider**. The application form opens in a popup, and the card then shows "under review" until an admin decides.
 
 - **Customers:** search providers with filters (kept in the URL). Book a provider, cancel, report "provider didn't come" (it unlocks 1 hour after the provider accepts), and leave reviews. Share photos of the work.
 - **Providers:** dashboard to go online or offline. Accept, reject, complete or cancel jobs (the customer's phone is shown once a job is accepted). Post photos of your work, reply to reviews, and edit your business profile.

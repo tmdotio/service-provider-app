@@ -3,7 +3,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import api, { getErrorMessage } from "../../api/axios";
 import { ReasonModal } from "../../components/BookingActions";
-import { Avatar, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatusBadge } from "../../components/ui";
+import { Avatar, Chips, EmptyState, ErrorBox, PageHeader, Pagination, Spinner, StatusBadge } from "../../components/ui";
 import useFetch from "../../hooks/useFetch";
 import { timeAgo } from "../../utils/format";
 
@@ -26,19 +26,19 @@ function Overview() {
   const cards = [
     ["Customers", s.totalCustomers],
     ["Providers", s.totalProviders],
-    ["Pending applications", s.pendingProviderRequests],
+    ["Applications", s.pendingProviderRequests, s.pendingProviderRequests > 0],
     ["Bookings", s.totalBookings],
     ["Posts", s.totalPosts],
-    ["Pending reports", s.pendingReports],
+    ["Reports", s.pendingReports, s.pendingReports > 0],
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {cards.map(([label, value]) => (
-          <div key={label} className="card p-4">
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className="mt-1 text-2xl font-bold">{value}</p>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {cards.map(([label, value, alert]) => (
+          <div key={label} className={`rounded-[28px] p-5 ${alert ? "bg-accent-gradient text-accent-ink" : "card"}`}>
+            <p className={`text-sm ${alert ? "opacity-75" : "text-muted"}`}>{label}</p>
+            <p className="font-wide mt-2 text-4xl">{value}</p>
           </div>
         ))}
       </div>
@@ -46,13 +46,13 @@ function Overview() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card p-4">
           <p className="mb-3 font-semibold">Bookings by status</p>
-          {Object.keys(s.bookingsByStatus).length === 0 && <p className="text-sm text-gray-500">No bookings yet</p>}
+          {Object.keys(s.bookingsByStatus).length === 0 && <p className="text-sm text-muted">No bookings yet</p>}
           <div className="space-y-2">
             {Object.entries(s.bookingsByStatus).map(([status, count]) => (
               <div key={status} className="flex items-center gap-3 text-sm">
-                <span className="w-24"><StatusBadge status={status} /></span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-full bg-brand-500" style={{ width: `${(count / s.totalBookings) * 100}%` }} />
+                <span className="w-28"><StatusBadge status={status} /></span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                  <div className="h-full rounded-full bg-accent-gradient" style={{ width: `${(count / s.totalBookings) * 100}%` }} />
                 </div>
                 <span className="w-8 text-right">{count}</span>
               </div>
@@ -62,7 +62,7 @@ function Overview() {
         <div className="card p-4">
           <p className="mb-3 font-semibold">Top providers</p>
           <table className="w-full text-sm">
-            <thead className="text-left text-gray-500">
+            <thead className="text-left text-muted">
               <tr><th className="pb-2 font-normal">Business</th><th className="pb-2 font-normal">Jobs</th><th className="pb-2 font-normal">Rating</th><th className="pb-2 font-normal">No-show</th></tr>
             </thead>
             <tbody>
@@ -71,7 +71,7 @@ function Overview() {
                   <td className="py-2">{p.businessName}</td>
                   <td>{p.completedJobs}</td>
                   <td>{p.averageRating.toFixed(1)}</td>
-                  <td className={p.noShowCount ? "text-red-600" : ""}>{p.noShowCount}</td>
+                  <td className={p.noShowCount ? "text-rose-500" : ""}>{p.noShowCount}</td>
                 </tr>
               ))}
             </tbody>
@@ -98,13 +98,13 @@ function ProviderRequests() {
             <Avatar user={r.user} />
             <div className="flex-1">
               <p className="font-semibold">{r.businessName}</p>
-              <p className="text-sm text-gray-500">{r.user?.name} · {r.user?.email} · {r.businessPhone}</p>
-              <p className="text-sm text-gray-500">{r.location?.city}, {r.location?.province} · {r.experienceYears} yrs · applied {timeAgo(r.createdAt)}</p>
+              <p className="text-sm text-muted">{r.user?.name} · {r.user?.email} · {r.businessPhone}</p>
+              <p className="text-sm text-muted">{r.location?.city}, {r.location?.province} · {r.experienceYears} yrs · applied {timeAgo(r.createdAt)}</p>
             </div>
           </div>
-          {r.description && <p className="mt-3 text-sm text-gray-700">{r.description}</p>}
+          {r.description && <p className="mt-3 text-sm text-fg/80">{r.description}</p>}
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {r.categories?.map((c) => <span key={c._id} className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs">{c.name}</span>)}
+            {r.categories?.map((c) => <span key={c._id} className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs">{c.name}</span>)}
           </div>
           <div className="mt-4 flex gap-2">
             <button
@@ -149,26 +149,26 @@ function Reports() {
       {data.reports.map((r) => (
         <div key={r._id} className="card p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Flag className="h-4 w-4 text-red-500" />
+            <Flag className="h-4 w-4 text-rose-500" />
             <span className="font-semibold">{r.reportsCount} report{r.reportsCount > 1 ? "s" : ""}</span>
             {r.reasons.map((reason) => (
-              <span key={reason} className="rounded-full bg-red-50 px-2 py-0.5 text-xs capitalize text-red-700">{reason}</span>
+              <span key={reason} className="rounded-full bg-rose-500/10 px-2 py-0.5 text-xs capitalize text-rose-500">{reason}</span>
             ))}
-            {r.post?.isHidden && <span className="text-xs text-gray-500">(hidden automatically)</span>}
+            {r.post?.isHidden && <span className="text-xs text-muted">(hidden automatically)</span>}
           </div>
           {r.post ? (
             <>
-              <p className="mt-3 text-sm text-gray-700">{r.post.text}</p>
+              <p className="mt-3 text-sm text-fg/80">{r.post.text}</p>
               <div className="mt-3 flex gap-2">
                 {r.post.images?.map((img) => (
                   <a key={img.url} href={img.url} target="_blank" rel="noreferrer">
-                    <img src={img.url} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                    <img src={img.url} alt="" className="h-20 w-20 rounded-2xl object-cover" />
                   </a>
                 ))}
               </div>
             </>
           ) : (
-            <p className="mt-3 text-sm text-gray-500">Post was deleted</p>
+            <p className="mt-3 text-sm text-muted">Post was deleted</p>
           )}
           <div className="mt-4 flex gap-2">
             <button className="btn-danger" onClick={() => action(() => api.patch(`/admin/reports/${r._id}`, { action: "remove" }), "Post removed", refetch)}>
@@ -212,10 +212,10 @@ function Categories() {
             <div key={c._id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="font-medium">{c.name}</p>
-                <p className="text-xs text-gray-500">{c.providersCount} providers</p>
+                <p className="text-xs text-muted">{c.providersCount} providers</p>
               </div>
               <button
-                className="p-2 text-gray-400 hover:text-red-600"
+                className="p-2 text-muted hover:text-rose-500"
                 aria-label={`Delete ${c.name}`}
                 onClick={() => window.confirm(`Delete "${c.name}"?`) && action(() => api.delete(`/admin/categories/${c._id}`), "Category deleted", refetch)}
               >
@@ -242,7 +242,7 @@ function Users() {
       <input className="input" placeholder="Search by name or email" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-gray-500">
+          <thead className="text-left text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">User</th>
               <th className="px-4 py-3 font-medium">Role</th>
@@ -255,13 +255,13 @@ function Users() {
               <tr key={u._id} className="border-t">
                 <td className="px-4 py-3">
                   <p className="font-medium">{u.name}</p>
-                  <p className="text-xs text-gray-500">{u.email}</p>
+                  <p className="text-xs text-muted">{u.email}</p>
                 </td>
                 <td className="px-4 py-3 capitalize">{u.role}</td>
-                <td className="px-4 py-3 text-gray-500">{timeAgo(u.createdAt)}</td>
+                <td className="px-4 py-3 text-muted">{timeAgo(u.createdAt)}</td>
                 <td className="px-4 py-3">
                   <button
-                    className={`btn px-3 py-1 text-xs ${u.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    className={`btn px-3 py-1 text-xs ${u.isActive ? "bg-lime-400/20 text-lime-700 dark:text-lime-300" : "bg-rose-500/15 text-rose-600 dark:text-rose-300"}`}
                     onClick={() =>
                       action(
                         () => api.patch(`/admin/users/${u._id}/status`, { isActive: !u.isActive }),
@@ -305,7 +305,7 @@ function Bookings() {
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-gray-500">
+            <thead className="text-left text-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Provider</th>
@@ -321,11 +321,11 @@ function Bookings() {
                   <td className="px-4 py-3">{b.provider?.businessName}</td>
                   <td className="px-4 py-3">{b.category?.name}</td>
                   <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
-                  <td className="px-4 py-3 text-gray-500">{timeAgo(b.createdAt)}</td>
+                  <td className="px-4 py-3 text-muted">{timeAgo(b.createdAt)}</td>
                 </tr>
               ))}
               {data?.bookings.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No bookings</td></tr>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted">No bookings</td></tr>
               )}
             </tbody>
           </table>
@@ -350,21 +350,9 @@ export default function AdminDashboard() {
   const Current = TABS.find(([key]) => key === tab)[2];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <PageHeader title="Admin panel" />
-      <div className="mb-6 flex gap-2 overflow-x-auto border-b">
-        {TABS.map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium ${
-              tab === key ? "border-brand-600 text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <PageHeader title="Control room" subtitle="Approve providers, keep the feed clean and watch bookings." />
+      <Chips className="mb-8" options={TABS.map(([key, label]) => [key, label])} value={tab} onChange={setTab} />
       <Current />
     </div>
   );

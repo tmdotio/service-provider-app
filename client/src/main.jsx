@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router";
 import App from "./App";
+import "@fontsource-variable/archivo/wdth.css";
+import "@fontsource-variable/urbanist";
 import "./index.css";
 import { restoreSession } from "./store/authSlice";
 import { store } from "./store/store";

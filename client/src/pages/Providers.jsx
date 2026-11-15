@@ -48,13 +48,13 @@ export default function Providers() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-10">
       <PageHeader
-        title="Find a provider"
+        title="Find a pro"
         subtitle={data ? `${data.pagination.total} provider${data.pagination.total === 1 ? "" : "s"} found` : " "}
       />
 
-      <div className="card mb-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="glass mb-8 grid gap-2 rounded-[32px] p-3 sm:grid-cols-2 lg:grid-cols-5">
         <input className="input lg:col-span-2" placeholder="Search by name or service..." value={q} onChange={(e) => setQ(e.target.value)} />
         <input className="input" placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
         <select className="input" value={params.get("category") || ""} onChange={(e) => setFilter("category", e.target.value)}>
@@ -69,24 +69,24 @@ export default function Providers() {
           <option value="experience">Most experienced</option>
           <option value="newest">Newest</option>
         </select>
-        <div className="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-5">
-          <SlidersHorizontal className="h-4 w-4 text-gray-400" />
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={params.get("availability") === "available"}
-              onChange={(e) => setFilter("availability", e.target.checked ? "available" : "")}
-            />
-            Available now
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={params.get("minRating") === "4"}
-              onChange={(e) => setFilter("minRating", e.target.checked ? "4" : "")}
-            />
-            4★ and above
-          </label>
+        <div className="flex flex-wrap items-center gap-2 px-1 pt-1 text-sm sm:col-span-2 lg:col-span-5">
+          <SlidersHorizontal className="mr-1 h-4 w-4 text-muted" />
+          <button
+            type="button"
+            className={`chip ${params.get("availability") === "available" ? "chip-active" : ""}`}
+            aria-pressed={params.get("availability") === "available"}
+            onClick={() => setFilter("availability", params.get("availability") === "available" ? "" : "available")}
+          >
+            🟢 Available now
+          </button>
+          <button
+            type="button"
+            className={`chip ${params.get("minRating") === "4" ? "chip-active" : ""}`}
+            aria-pressed={params.get("minRating") === "4"}
+            onClick={() => setFilter("minRating", params.get("minRating") === "4" ? "" : "4")}
+          >
+            ★ 4 and above
+          </button>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default function Providers() {
       ) : data?.providers.length === 0 ? (
         <EmptyState icon={SearchX} title="No providers found" text="Try another city or service, or remove some filters." />
       ) : (
-        <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 ${loading ? "opacity-60" : ""}`}>
+        <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
           {data?.providers.map((p) => <ProviderCard key={p._id} provider={p} />)}
         </div>
       )}
