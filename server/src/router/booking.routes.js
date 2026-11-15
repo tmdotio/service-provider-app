@@ -32,13 +32,13 @@ const reasonRequired = [
 
 /**
  * @route   GET /api/booking/customer
- * @desc    Get all bookings created by the logged-in customer
- * @access  Private (Customer)
+ * @desc    Bookings I made (as a customer)
+ * @access  Private (Customer, Provider: a customer who became a provider keeps their bookings)
  */
 bookingRoute.get(
   "/customer",
   authenticate,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "provider"),
   getMyBookings,
 );
 
@@ -69,13 +69,13 @@ bookingRoute.get(
 /**
  * @route   POST /api/booking/:providerId
  * @desc    Create a booking request for a service provider
- * @access  Private (Customer)
+ * @access  Private (Customer, Provider: providers can hire other providers, never themselves)
  * @body    category, description, serviceAddress
  */
 bookingRoute.post(
   "/:providerId",
   authenticate,
-  authorizeRoles("customer"),
+  authorizeRoles("customer", "provider"),
   createBookingValidator,
   validateRequest,
   createBooking,

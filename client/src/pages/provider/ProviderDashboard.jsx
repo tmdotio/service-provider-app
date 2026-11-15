@@ -1,8 +1,8 @@
-import { Bell, CalendarX, Images, LayoutGrid, MapPin, Pencil, Phone, Power, Star, Wrench } from "lucide-react";
+import { Bell, CalendarX, ImagePlus, Images, Loader2, LayoutGrid, MapPin, Pencil, Phone, Power, Star, Wrench } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import api, { getErrorMessage } from "../../api/axios";
 import { ReasonModal } from "../../components/BookingActions";
 import CreatePostForm from "../../components/CreatePostForm";
@@ -24,7 +24,7 @@ import {
 import useAuth from "../../hooks/useAuth";
 import useFetch from "../../hooks/useFetch";
 import { fetchMe } from "../../store/authSlice";
-import { timeAgo } from "../../utils/format";
+import { checkImageFile, timeAgo } from "../../utils/format";
 
 const TABS = {
   requests: ["pending"],
@@ -213,8 +213,7 @@ function MyPosts({ providerId }) {
   return (
     <div className="space-y-4">
       <CreatePostForm
-        providerId={providerId}
-        placeholder="Show customers your latest work (before/after photos work great)..."
+        placeholder="What was the problem, and what did you do?"
         onCreated={(post) => setData((d) => ({ ...d, posts: [post, ...(d?.posts || [])] }))}
       />
       {loading ? (
@@ -228,7 +227,68 @@ function MyPosts({ providerId }) {
   );
 }
 
-function EditProfileModal({ profile, open, onClose, onSaved }) {
+/** Cover image for the public profile: preview, change, remove (max 1 MB). */
+function BannerEditor({ banner, onChanged }) {
+  const [busy, setBusy] = useState(false);
+
+  const upload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const problem = checkImageFile(file);
+    if (problem) return toast.error(problem);
+
+    const data = new FormData();
+    data.append("image", file);
+    setBusy(true);
+    try {
+      await api.patch("/provider/me/banner", data);
+      toast.success("Banner updated");
+      onChanged();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await api.delete("/provider/me/banner");
+      toast.success("Banner removed");
+      onChanged();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="label">Banner image</p>
+      <div className="relative h-32 overflow-hidden rounded-[22px] bg-accent-gradient sm:h-40">
+        {banner?.url && <img src={banner.url} alt="Current banner" className="h-full w-full object-cover" />}
+        <div className="absolute bottom-3 right-3 flex gap-2">
+          {banner?.url && (
+            <button type="button" className="btn bg-black/60 text-white backdrop-blur hover:bg-black/75" onClick={remove} disabled={busy}>
+              Remove
+            </button>
+          )}
+          <label className={`btn cursor-pointer bg-white/90 text-accent-ink hover:bg-white ${busy ? "pointer-events-none opacity-60" : ""}`}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+            {banner?.url ? "Change" : "Add banner"}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={upload} />
+          </label>
+        </div>
+      </div>
+      <p className="mt-1.5 text-xs text-muted">Shown at the top of your public profile. Wide photo, max 1 MB.</p>
+    </div>
+  );
+}
+
+function EditProfileModal({ profile, open, onClose, onSaved, onBannerChanged }) {
   const [form, setForm] = useState({
     businessName: profile.businessName,
     businessPhone: profile.businessPhone,
@@ -260,8 +320,9 @@ function EditProfileModal({ profile, open, onClose, onSaved }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit business profile">
-      <form onSubmit={submit} className="space-y-4">
+    <Modal open={open} onClose={onClose} title="Edit business profile" wide>
+      <BannerEditor banner={profile.bannerImage} onChanged={onBannerChanged} />
+      <form onSubmit={submit} className="mt-5 space-y-4">
         <div>
           <label className="label" htmlFor="bn">Business name</label>
           <input id="bn" className="input" required value={form.businessName} onChange={set("businessName")} />
@@ -297,8 +358,12 @@ export default function ProviderDashboard() {
   const { providerProfile: profile } = useAuth();
   const dispatch = useDispatch();
   const [tab, setTab] = useState("requests");
-  const [section, setSection] = useState("jobs");
-  const [editOpen, setEditOpen] = useState(false);
+  // Links like /provider?section=posts or /provider?edit=1 open the right place
+  const [params] = useSearchParams();
+  const [section, setSection] = useState(() =>
+    ["jobs", "posts", "reviews"].includes(params.get("section")) ? params.get("section") : "jobs",
+  );
+  const [editOpen, setEditOpen] = useState(() => params.get("edit") === "1");
   const [toggling, setToggling] = useState(false);
 
   const bookings = useFetch(() => api.get("/booking/provider"), []);
@@ -447,6 +512,7 @@ export default function ProviderDashboard() {
             setEditOpen(false);
             dispatch(fetchMe());
           }}
+          onBannerChanged={() => dispatch(fetchMe())}
         />
       )}
     </div>

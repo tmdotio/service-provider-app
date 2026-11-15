@@ -7,12 +7,15 @@ import {
   getMyProviderProfile,
   getProviderPublicProfile,
   searchProviders,
+  removeBanner,
   updateAvailability,
+  updateBanner,
   updateMyProviderProfile,
 } from "../controllers/provder.controller.js";
 import { getProviderReviews } from "../controllers/review.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { authorizeRoles } from "../middlewares/role.middleware.js";
+import { uploadSingleImage } from "../middlewares/upload.middleware.js";
 import { validateObjectId } from "../middlewares/validateObjectId.js";
 import {
   becomeProviderValidator,
@@ -103,6 +106,16 @@ providerRoute.patch(
   validateRequest,
   updateAvailability,
 );
+
+/**
+ * Upload / remove my banner (cover) image, max 1 MB.
+ *
+ * @route   PATCH /api/provider/me/banner   (form-data field "image")
+ * @route   DELETE /api/provider/me/banner
+ * @access  Private/Provider
+ */
+providerRoute.patch("/me/banner", authenticate, authorizeRoles("provider"), uploadSingleImage, updateBanner);
+providerRoute.delete("/me/banner", authenticate, authorizeRoles("provider"), removeBanner);
 
 /**
  * Get approved providers by category.

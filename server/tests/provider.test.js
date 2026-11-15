@@ -7,6 +7,7 @@ import {
   createApprovedProvider,
   createCategory,
   createCustomer,
+  pngBuffer,
 } from "./helpers.js";
 
 let admin;
@@ -92,6 +93,64 @@ describe("Provider search & profile", () => {
       .patch("/api/provider/me")
       .set(auth(customer.token))
       .send({ description: "x" });
+    expect(denied.status).toBe(403);
+  });
+});
+
+describe("Customer becomes a provider", () => {
+  it("keeps the bookings they made as a customer", async () => {
+    const pro = await createApprovedProvider({ admin, category: plumbing, name: "Hired" });
+    const customer = await createCustomer("Switcher");
+    const booked = await api()
+      .post(`/api/booking/${pro.providerId}`)
+      .set(auth(customer.token))
+      .send({
+        category: String(plumbing._id),
+        description: "Bathroom tap is leaking badly",
+        serviceAddress: "Gulberg, Lahore",
+      });
+    expect(booked.status).toBe(201);
+
+    // Same person applies and is approved
+    await api()
+      .post("/api/provider/become-provider")
+      .set(auth(customer.token))
+      .send({
+        businessName: "Switcher Repairs",
+        businessPhone: "03001234567",
+        experienceYears: 2,
+        categories: [String(plumbing._id)],
+        location: { city: "Lahore", province: "Punjab", country: "Pakistan" },
+      });
+    await api()
+      .patch(`/api/admin/provider-requests/${customer.user.id}/review`)
+      .set(auth(admin.token))
+      .send({ action: "approve" });
+
+    const mine = await api().get("/api/booking/customer").set(auth(customer.token));
+    expect(mine.status).toBe(200);
+    expect(mine.body.bookings).toHaveLength(1);
+  });
+});
+
+describe("Provider banner", () => {
+  it("provider uploads a banner; it shows on the public profile; customers cannot", async () => {
+    const p = await createApprovedProvider({ admin, category: painting, name: "Banner" });
+    const res = await api()
+      .patch("/api/provider/me/banner")
+      .set(auth(p.token))
+      .attach("image", pngBuffer(), { filename: "cover.png", contentType: "image/png" });
+    expect(res.status).toBe(200);
+    expect(res.body.bannerImage.url).toMatch(/^https:/);
+
+    const profile = await api().get(`/api/provider/${p.providerId}`);
+    expect(profile.body.provider.bannerImage.url).toBe(res.body.bannerImage.url);
+
+    const customer = await createCustomer();
+    const denied = await api()
+      .patch("/api/provider/me/banner")
+      .set(auth(customer.token))
+      .attach("image", pngBuffer(), { filename: "cover.png", contentType: "image/png" });
     expect(denied.status).toBe(403);
   });
 });

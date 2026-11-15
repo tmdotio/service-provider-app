@@ -3,22 +3,15 @@ import { useState } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
-import { Chips, EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
+import { EmptyState, ErrorBox, PageHeader, Spinner } from "../components/ui";
 import useFetch from "../hooks/useFetch";
 
-const FILTERS = [
-  ["", "All"],
-  ["showcase", "Providers' work"],
-  ["experience", "Customer experiences"],
-];
-
 export default function Feed() {
-  const [type, setType] = useState("");
   const [page, setPage] = useState(1);
   const [posts, setPosts] = useState([]);
 
   const { data, loading, error } = useFetch(async () => {
-    const res = await api.get("/posts", { params: { type: type || undefined, page, limit: 10 } });
+    const res = await api.get("/posts", { params: { page, limit: 10 } });
     // Page 1 replaces the list, next pages are added ("Load more")
     // (skip posts we already have, so a repeated request can't duplicate them)
     setPosts((old) => {
@@ -27,12 +20,7 @@ export default function Feed() {
       return [...old, ...res.data.posts.filter((p) => !seen.has(p._id))];
     });
     return res;
-  }, [type, page]);
-
-  const changeType = (t) => {
-    setType(t);
-    setPage(1);
-  };
+  }, [page]);
 
   const hasMore = data && page < data.pagination.totalPages;
 
@@ -40,13 +28,11 @@ export default function Feed() {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <PageHeader
         title="Work board"
-        subtitle="Real photos of jobs done by providers, shared by them and their customers."
+        subtitle="Before/after photos of real jobs, posted by the pros themselves."
       />
 
-      <Chips className="mb-5" options={FILTERS} value={type} onChange={changeType} />
-
       <p className="mb-6 rounded-[20px] border border-accent/30 bg-accent/10 px-5 py-3.5 text-sm">
-        Want to post? Open a provider's profile and share photos of their work.{" "}
+        Real jobs posted by our pros, with before/after photos. Have a question? Ask in the comments — the pro can reply.{" "}
         <Link to="/providers" className="font-semibold text-accent underline underline-offset-2">Find a pro</Link>
       </p>
 

@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import Booking from "../models/booking.model.js";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
 import Report from "../models/report.model.js";
@@ -15,7 +14,11 @@ const AUTO_HIDE_REPORTS = 5;
 
 const POPULATE_POST = [
   { path: "author", select: "name avatar role" },
-  { path: "provider", select: "businessName averageRating user" },
+  {
+    path: "provider",
+    select: "businessName averageRating totalReviews user",
+    populate: { path: "user", select: "name avatar" },
+  },
 ];
 
 /**
@@ -41,31 +44,31 @@ const findVisiblePost = async (postId) => {
 };
 
 /**
- * Create a post with 1-4 images (each under 1 MB) about a provider.
+ * Provider posts their own work with before/after photos.
+ * Only approved providers can post, and only on their own profile.
+ * Customers take part through comments.
  *
- * - If you ARE the provider: a "showcase" post of your work.
- * - Otherwise: an "experience" post about how the provider worked.
- *   It gets a "verified customer" badge if you had a completed booking.
+ * Images: up to 2 "before" + up to 2 "after" (at least 1 after), each < 1 MB.
  *
  * @route   POST /api/posts   (multipart/form-data)
- * @access  Private
- * @body    providerId, text, images[] (files)
+ * @access  Private/Provider
+ * @body    text, files: before[], after[]
  */
 export const createPost = async (req, res) => {
-  const { providerId, text } = req.body;
-  const files = req.files || [];
-
-  if (files.length === 0) {
-    throw new ApiError(400, "Please add at least one image");
-  }
+  const { text } = req.body;
+  const { before = [], after = [] } = req.postFiles || {};
 
   const provider = await ServiceProvider.findOne({
-    _id: providerId,
+    user: req.user._id,
     verificationStatus: "approved",
   }).select("_id user");
 
   if (!provider) {
-    throw new ApiError(404, "Provider not found");
+    throw new ApiError(403, "Only approved providers can post their work");
+  }
+
+  if (after.length === 0) {
+    throw new ApiError(400, "Please add at least one photo of the finished work");
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -77,30 +80,23 @@ export const createPost = async (req, res) => {
     throw new ApiError(429, `You can create up to ${MAX_POSTS_PER_DAY} posts per day`);
   }
 
-  const isOwnProfile = provider.user.equals(req.user._id);
-
-  const isVerifiedCustomer =
-    !isOwnProfile &&
-    Boolean(
-      await Booking.exists({
-        customer: req.user._id,
-        provider: provider._id,
-        status: "completed",
-      }),
-    );
-
   // Upload only after all checks pass
-  const images = await uploadImages(files, "posts");
+  const [beforeImages, afterImages] = await Promise.all([
+    uploadImages(before, "posts"),
+    uploadImages(after, "posts"),
+  ]);
+  const images = [
+    ...beforeImages.map((img) => ({ ...img, label: "before" })),
+    ...afterImages.map((img) => ({ ...img, label: "after" })),
+  ];
 
   let post;
   try {
     post = await Post.create({
       author: req.user._id,
       provider: provider._id,
-      type: isOwnProfile ? "showcase" : "experience",
       text,
       images,
-      isVerifiedCustomer,
     });
   } catch (error) {
     // Saving failed -> remove the images we just uploaded
@@ -122,10 +118,10 @@ export const createPost = async (req, res) => {
  *
  * @route   GET /api/posts
  * @access  Public (shows likedByMe if logged in)
- * @query   provider, author, type, page, limit
+ * @query   provider, author, page, limit
  */
 export const getPosts = async (req, res) => {
-  const { provider, author, type } = req.query;
+  const { provider, author } = req.query;
   const { page, limit, skip } = getPagination(req.query);
 
   const filter = { isHidden: false };
@@ -137,10 +133,6 @@ export const getPosts = async (req, res) => {
       }
       filter[key] = value;
     }
-  }
-
-  if (type) {
-    filter.type = String(type);
   }
 
   const [posts, total] = await Promise.all([
@@ -278,7 +270,7 @@ export const toggleLike = async (req, res) => {
 };
 
 /**
- * Comments of a post (newest first).
+ * Comments of a post (newest first), each with the provider's replies.
  *
  * @route   GET /api/posts/:id/comments
  * @access  Public
@@ -287,60 +279,94 @@ export const getComments = async (req, res) => {
   const post = await findVisiblePost(req.params.id);
   const { page, limit, skip } = getPagination(req.query, 20);
 
+  const filter = { post: post._id, parent: null };
+
   const [comments, total] = await Promise.all([
-    Comment.find({ post: post._id })
+    Comment.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("author", "name avatar role"),
-    Comment.countDocuments({ post: post._id }),
+      .populate("author", "name avatar role")
+      .lean(),
+    Comment.countDocuments(filter),
   ]);
+
+  // Load replies for this page of comments in one query
+  const replies = await Comment.find({ parent: { $in: comments.map((c) => c._id) } })
+    .sort({ createdAt: 1 })
+    .populate("author", "name avatar role")
+    .lean();
+
+  const repliesByParent = {};
+  for (const r of replies) {
+    (repliesByParent[r.parent] ||= []).push(r);
+  }
 
   res.status(200).json({
     success: true,
-    comments,
+    comments: comments.map((c) => ({ ...c, replies: repliesByParent[c._id] || [] })),
     pagination: paginationMeta(total, page, limit),
   });
 };
 
 /**
- * Add a comment.
+ * Add a comment, or (provider only) reply to a comment.
+ *
+ * - Anyone logged in can comment on a post.
+ * - Only the provider who made the post can reply (parentId).
  *
  * @route   POST /api/posts/:id/comments
  * @access  Private
- * @body    text
+ * @body    text, parentId?
  */
 export const addComment = async (req, res) => {
   const post = await findVisiblePost(req.params.id);
+  const { text, parentId } = req.body;
+
+  let parent = null;
+  if (parentId) {
+    if (!post.author.equals(req.user._id)) {
+      throw new ApiError(403, "Only the provider who posted this can reply to comments");
+    }
+
+    parent = await Comment.findOne({ _id: parentId, post: post._id, parent: null });
+    if (!parent) {
+      throw new ApiError(404, "Comment to reply to was not found");
+    }
+  }
 
   const comment = await Comment.create({
     post: post._id,
     author: req.user._id,
-    text: req.body.text,
+    parent: parent?._id || null,
+    text,
   });
 
   await Post.findByIdAndUpdate(post._id, { $inc: { commentsCount: 1 } });
 
-  if (!post.author.equals(req.user._id)) {
-    await notify(
-      post.author,
-      "post_commented",
-      `${req.user.name} commented on your post`,
-      { post: post._id },
-    );
+  if (parent) {
+    if (!parent.author.equals(req.user._id)) {
+      await notify(parent.author, "comment_replied", `${req.user.name} replied to your comment`, {
+        post: post._id,
+      });
+    }
+  } else if (!post.author.equals(req.user._id)) {
+    await notify(post.author, "post_commented", `${req.user.name} commented on your post`, {
+      post: post._id,
+    });
   }
 
   await comment.populate("author", "name avatar role");
 
   res.status(201).json({
     success: true,
-    message: "Comment added",
-    comment,
+    message: parent ? "Reply added" : "Comment added",
+    comment: { ...comment.toObject(), replies: [] },
   });
 };
 
 /**
- * Delete a comment.
+ * Delete a comment (and its replies).
  *
  * @route   DELETE /api/posts/:id/comments/:commentId
  * @access  Private (comment author, post author, or admin)
@@ -366,8 +392,9 @@ export const deleteComment = async (req, res) => {
     throw new ApiError(403, "You cannot delete this comment");
   }
 
+  const { deletedCount: replies } = await Comment.deleteMany({ parent: comment._id });
   await comment.deleteOne();
-  await Post.findByIdAndUpdate(req.params.id, { $inc: { commentsCount: -1 } });
+  await Post.findByIdAndUpdate(req.params.id, { $inc: { commentsCount: -(1 + replies) } });
 
   res.status(200).json({
     success: true,

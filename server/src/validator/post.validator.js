@@ -1,10 +1,6 @@
 import { body } from "express-validator";
 
 export const createPostValidator = [
-  body("providerId")
-    .isMongoId()
-    .withMessage("A valid providerId is required"),
-
   body("text")
     .isString()
     .withMessage("Post text is required")
@@ -25,6 +21,11 @@ export const updatePostValidator = [
 ];
 
 export const commentValidator = [
+  body("parentId")
+    .optional({ values: "falsy" })
+    .isMongoId()
+    .withMessage("Invalid comment to reply to"),
+
   body("text")
     .isString()
     .withMessage("Comment text is required")

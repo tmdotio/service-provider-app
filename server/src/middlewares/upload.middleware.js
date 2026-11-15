@@ -64,9 +64,21 @@ export const verifyImageContent = (req, res, next) => {
 /** One image in the "image" field (avatar). */
 export const uploadSingleImage = [upload.single("image"), verifyImageContent];
 
-/** 1-4 images in the "images" field (posts). */
+/** Posts: up to 2 "before" and 2 "after" images (4 total). */
 export const uploadPostImages = [
-  upload.array("images", MAX_POST_IMAGES),
+  upload.fields([
+    { name: "before", maxCount: 2 },
+    { name: "after", maxCount: 2 },
+  ]),
+  // multer.fields gives { before: [...], after: [...] }; keep both and a flat list
+  (req, res, next) => {
+    req.postFiles = {
+      before: req.files?.before || [],
+      after: req.files?.after || [],
+    };
+    req.files = [...req.postFiles.before, ...req.postFiles.after];
+    next();
+  },
   verifyImageContent,
 ];
 

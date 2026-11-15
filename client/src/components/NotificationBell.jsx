@@ -12,7 +12,7 @@ const linkFor = (n, role) => {
   if (n.type.startsWith("booking_") || n.type === "review_received") {
     return role === "provider" ? "/provider" : "/bookings";
   }
-  if (n.type.startsWith("post_")) return "/feed";
+  if (n.type.startsWith("post_") || n.type === "comment_replied") return "/feed";
   if (n.type.startsWith("provider_")) return role === "provider" ? "/provider" : "/account";
   return "/";
 };
@@ -95,7 +95,7 @@ export default function NotificationBell() {
               </button>
             )}
           </div>
-          <ul className="max-h-96 overflow-y-auto">
+          <ul data-lenis-prevent className="max-h-96 overflow-y-auto overscroll-contain">
             {items.length === 0 && (
               <li className="px-4 py-10 text-center text-sm text-muted">No notifications yet</li>
             )}

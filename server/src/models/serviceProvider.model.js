@@ -117,6 +117,12 @@ const providerSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Cover image on the public profile (uploaded to ImageKit)
+    bannerImage: {
+      url: { type: String, default: "" },
+      fileId: { type: String, default: "" },
+    },
+
     // How many times customers reported the provider did not come
     noShowCount: {
       type: Number,

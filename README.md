@@ -37,13 +37,14 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 - The provider's average rating is recalculated with an aggregation, and a star breakdown is returned.
 - Providers can reply to reviews.
 
-**Posts** (photos of a provider's work)
-- 1–4 images per post, **each under 1 MB**, JPG, PNG or WEBP only.
-- The real file type is checked from the file's bytes, so a renamed text file is rejected. Images are uploaded to ImageKit.
-- When a provider posts about their own work it is a `showcase` post. When a customer posts about a provider it is an `experience` post. It gets a **verified customer** badge if the customer had a completed booking with that provider.
-- Likes are a toggle and stay correct when two requests arrive at the same time. Posts support comments.
-- Users can report a post. After 5 reports it is hidden automatically until an admin reviews it.
-- Deleting a post also deletes its images from ImageKit.
+**Posts** (a provider's own work)
+- **Only providers post**, about their own jobs: up to 2 **before** and 2 **after** photos (at least 1 after), each **under 1 MB**, JPG/PNG/WEBP. The real file type is checked from the bytes. Photos go to ImageKit.
+- **Customers comment** to ask questions; **only the provider who posted can reply** (one level), and the customer gets a notification.
+- Likes (correct even with double clicks), reports (hidden after 5, then an admin reviews), and deleting a post removes its images from ImageKit.
+
+**Provider banner**: providers upload a cover image (max 1 MB) for their public page; the old one is deleted from ImageKit.
+
+**Customer → provider**: after approval the menu switches to provider sections, a setup checklist guides them (banner, go online, first post), and they keep the bookings they made as a customer (providers can also hire other providers, never themselves).
 
 **Notifications**
 - Sent for bookings, reviews, likes, comments, provider approval and moderation.
@@ -66,6 +67,8 @@ pending ──accept──▶ in_progress ──complete──▶ completed
 **Design:** dark and light themes with a switch (it follows the computer's setting the first time), one warm orange accent, a wide display headline font (Archivo) with Urbanist for text, frosted-glass navbar and popups, and cards with a round cut-out corner holding the action button (done with a CSS mask, so it works on any background). Every colour is a CSS variable, so the whole theme changes in one place.
 
 - **Become a provider:** customers open **My profile** and tap **Become a provider**. The application form opens in a popup, and the card then shows "under review" until an admin decides.
+- **Mobile first:** app-style bottom tab bar with role-based sections, popups that slide up as bottom sheets, 16px inputs (no iPhone zoom), safe-area padding for notched phones.
+- **Smooth scrolling** with Lenis (off when the system asks for reduced motion; popups pause it).
 
 - **Customers:** search providers with filters (kept in the URL). Book a provider, cancel, report "provider didn't come" (it unlocks 1 hour after the provider accepts), and leave reviews. Share photos of the work.
 - **Providers:** dashboard to go online or offline. Accept, reject, complete or cancel jobs (the customer's phone is shown once a job is accepted). Post photos of your work, reply to reviews, and edit your business profile.
@@ -108,7 +111,7 @@ Demo mode runs on a temporary in-memory database filled with sample providers, b
 npm test
 ```
 
-There are 43 API tests. They run against an in-memory MongoDB replica set, ImageKit is faked, and your real database is never touched.
+There are 47 API tests. They run against an in-memory MongoDB replica set, ImageKit is faked, and your real database is never touched.
 
 ---
 
@@ -134,6 +137,7 @@ Send `Authorization: Bearer <accessToken>` on private routes.
 | GET | `/application` | Private | My application status |
 | GET / PATCH | `/me` | Provider | My profile / update it |
 | PATCH | `/me/availability` | Provider | `available` \| `offline` |
+| PATCH / DELETE | `/me/banner` | Provider | Banner image (multipart `image`, < 1 MB) |
 | GET | `/category/:categoryId` | Public | Providers in a category |
 | GET | `/:id` | Public | Public profile |
 | GET | `/:id/reviews` | Public | Reviews + star breakdown |
@@ -167,10 +171,10 @@ Send `Authorization: Bearer <accessToken>` on private routes.
 | Method | Path | Access | Notes |
 |---|---|---|---|
 | GET | `/` | Public | `provider, author, type, page, limit` (+ `likedByMe` when logged in) |
-| POST | `/` | Private | **multipart**: providerId, text, images[] (1–4, < 1 MB each) |
+| POST | `/` | Provider | **multipart**: text, before[] (0–2), after[] (1–2), each < 1 MB |
 | GET / PATCH / DELETE | `/:id` | Public / Author / Author+Admin | |
 | POST | `/:id/like` | Private | Toggle |
-| GET / POST | `/:id/comments` | Public / Private | |
+| GET / POST | `/:id/comments` | Public / Private | Comments with replies; `parentId` = reply (post's provider only) |
 | DELETE | `/:id/comments/:commentId` | Comment author / Post author / Admin | |
 | POST | `/:id/report` | Private | reason: spam\|fake\|abusive\|inappropriate\|other |
 

@@ -12,6 +12,7 @@ import {
   updatePost,
 } from "../controllers/post.controller.js";
 import { authenticate, optionalAuth } from "../middlewares/auth.middleware.js";
+import { authorizeRoles } from "../middlewares/role.middleware.js";
 import { uploadPostImages } from "../middlewares/upload.middleware.js";
 import { validateObjectId } from "../middlewares/validateObjectId.js";
 import {
@@ -26,20 +27,21 @@ const postRoute = Router();
 
 /**
  * @route   GET /api/posts
- * @desc    Feed (newest first). Filters: provider, author, type
+ * @desc    Feed (newest first). Filters: provider, author
  * @access  Public (shows likedByMe when logged in)
  */
 postRoute.get("/", optionalAuth, getPosts);
 
 /**
  * @route   POST /api/posts   (multipart/form-data)
- * @desc    Create a post about a provider with 1-4 images (each < 1 MB)
- * @access  Private
- * @body    providerId, text, images (files)
+ * @desc    Provider posts their own work: before[] (0-2) + after[] (1-2) photos, each < 1 MB
+ * @access  Private/Provider
+ * @body    text, before (files), after (files)
  */
 postRoute.post(
   "/",
   authenticate,
+  authorizeRoles("provider"),
   uploadPostImages, // multer must run before validators (it parses the body)
   createPostValidator,
   validateRequest,
@@ -88,6 +90,7 @@ postRoute.get("/:id/comments", validateObjectId("id"), getComments);
 
 /**
  * @route   POST /api/posts/:id/comments
+ * @desc    Comment (anyone logged in) or reply with parentId (the post's provider only)
  * @access  Private
  */
 postRoute.post(

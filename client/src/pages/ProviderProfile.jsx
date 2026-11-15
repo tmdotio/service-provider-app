@@ -145,41 +145,54 @@ function Reviews({ providerId }) {
   );
 }
 
-function Posts({ provider }) {
+/** Only the provider posts on their own page; everyone else comments. */
+function PostComposer({ provider, onCreated }) {
   const { user } = useAuth();
+  const isOwner = user && provider.user?._id === user._id;
+
+  if (isOwner) {
+    return <CreatePostForm placeholder="What was the problem, and what did you do?" onCreated={onCreated} />;
+  }
+
+  return (
+    <p className="rounded-[20px] bg-surface-2 px-5 py-4 text-sm text-muted">
+      Photos posted by <strong className="text-fg">{provider.businessName}</strong>.{" "}
+      {user ? "Ask a question in the comments — they can reply." : (
+        <>
+          <Link to="/login" className="font-semibold text-accent hover:underline">Log in</Link> to comment and ask questions.
+        </>
+      )}
+    </p>
+  );
+}
+
+function Posts({ provider }) {
   const { data, loading, setData } = useFetch(
     () => api.get("/posts", { params: { provider: provider._id, limit: 20 } }),
     [provider._id],
   );
 
-  const isOwner = user && provider.user?._id === user._id;
-
   return (
     <div className="space-y-4">
-      {user ? (
-        <CreatePostForm
-          providerId={provider._id}
-          placeholder={isOwner ? "Show your latest work..." : `How was your experience with ${provider.businessName}?`}
-          onCreated={(post) => setData((d) => ({ ...d, posts: [post, ...(d?.posts || [])] }))}
-        />
-      ) : (
-        <p className="text-sm text-muted">
-          <Link to="/login" className="text-accent hover:underline">Log in</Link> to share photos of their work.
-        </p>
-      )}
+      <PostComposer
+        provider={provider}
+        onCreated={(post) => setData((d) => ({ ...d, posts: [post, ...(d?.posts || [])] }))}
+      />
 
       {loading ? (
         <Spinner />
       ) : data?.posts.length === 0 ? (
-        <EmptyState icon={Images} title="No posts yet" text="Photos of this provider's work will appear here." />
+        <EmptyState icon={Images} title="No posts yet" text="Before/after photos of this provider's jobs will appear here." />
       ) : (
-        data?.posts.map((p) => (
-          <PostCard
-            key={p._id}
-            post={p}
-            onDeleted={(id) => setData((d) => ({ ...d, posts: d.posts.filter((x) => x._id !== id) }))}
-          />
-        ))
+        <div className="grid gap-4 md:grid-cols-2">
+          {data?.posts.map((p) => (
+            <PostCard
+              key={p._id}
+              post={p}
+              onDeleted={(id) => setData((d) => ({ ...d, posts: d.posts.filter((x) => x._id !== id) }))}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -188,7 +201,7 @@ function Posts({ provider }) {
 export default function ProviderProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isCustomer } = useAuth();
+  const { user } = useAuth();
   const [tab, setTab] = useState("reviews");
   const [bookingOpen, setBookingOpen] = useState(false);
 
@@ -204,6 +217,7 @@ export default function ProviderProfile() {
   }
 
   const { provider, postsCount } = data;
+  const isOwnPage = user && provider.user?._id === user._id;
   const canBook = provider.availabilityStatus === "available";
 
   const onBook = () => {
@@ -216,15 +230,19 @@ export default function ProviderProfile() {
       <ErrorBox message={error} />
 
       <div className="card overflow-hidden">
-        <div className="relative h-32 bg-accent-gradient sm:h-40">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgb(255_255_255/0.35),transparent_45%)]" />
+        <div className="relative h-36 bg-accent-gradient sm:h-56">
+          {provider.bannerImage?.url ? (
+            <img src={provider.bannerImage.url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgb(255_255_255/0.35),transparent_45%)]" />
+          )}
         </div>
         <div className="px-6 pb-6">
           <div className="relative -mt-12 flex flex-wrap items-end justify-between gap-4">
             <div className="rounded-full bg-surface p-1.5">
               <Avatar user={provider.user} size="h-24 w-24" />
             </div>
-            {(!user || isCustomer) && (
+            {!isOwnPage && (
               <div className="flex items-center gap-3">
                 {!canBook && (
                   <span className="text-sm text-muted">

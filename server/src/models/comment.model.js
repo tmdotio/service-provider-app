@@ -14,6 +14,13 @@ const commentSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Set when this is the provider's reply to a comment (one level deep)
+    parent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+    },
+
     text: {
       type: String,
       trim: true,
@@ -24,7 +31,7 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-commentSchema.index({ post: 1, createdAt: -1 });
+commentSchema.index({ post: 1, parent: 1, createdAt: -1 });
 
 const Comment = mongoose.model("Comment", commentSchema);
 

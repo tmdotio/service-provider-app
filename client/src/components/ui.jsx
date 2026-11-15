@@ -1,5 +1,6 @@
 import { ArrowUpRight, Loader2, Star, X } from "lucide-react";
 import { useEffect } from "react";
+import { startScroll, stopScroll } from "../utils/smoothScroll";
 import { Link } from "react-router";
 import { initials } from "../utils/format";
 
@@ -244,9 +245,11 @@ export function Modal({ open, onClose, title, children, wide = false }) {
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    stopScroll(); // the page behind the popup must not move
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      startScroll();
     };
   }, [open, onClose]);
 
@@ -254,13 +257,18 @@ export function Modal({ open, onClose, title, children, wide = false }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-3"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
-      <div className={`glass max-h-[92vh] w-full overflow-y-auto rounded-[28px] p-6 shadow-2xl ${wide ? "max-w-2xl" : "max-w-lg"}`}>
+      {/* On phones it slides up from the bottom like an app sheet */}
+      <div
+        data-lenis-prevent
+        className={`glass max-h-[90dvh] w-full overflow-y-auto overscroll-contain rounded-t-[28px] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl animate-[sheet-up_0.25s_ease-out] sm:rounded-[28px] sm:p-6 ${wide ? "max-w-2xl" : "max-w-lg"}`}
+      >
+        <div className="mx-auto -mt-1 mb-3 h-1.5 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-xl font-bold">{title}</h2>
           <button onClick={onClose} className="icon-btn h-9 w-9" aria-label="Close">

@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
-import { Link, Navigate, Route, Routes } from "react-router";
-import Navbar from "./components/Navbar";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router";
+import Navbar, { MobileTabBar } from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -14,6 +15,7 @@ import Providers from "./pages/Providers";
 import Register from "./pages/Register";
 import { DisplayTitle } from "./components/ui";
 import { APP_NAME, APP_TAGLINE } from "./utils/format";
+import { initSmoothScroll, scrollToTop } from "./utils/smoothScroll";
 
 const YEAR = new Date().getFullYear();
 
@@ -27,11 +29,25 @@ function NotFound() {
   );
 }
 
+/** Start smooth scrolling once, and jump to the top on every page change. */
+function ScrollManager() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    initSmoothScroll();
+  }, []);
+  useEffect(() => {
+    scrollToTop();
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
+      <ScrollManager />
       <Navbar />
-      <main className="flex-1">
+      {/* Extra space at the bottom on phones so the tab bar never covers content */}
+      <main className="flex-1 pb-28 md:pb-0">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/providers" element={<Providers />} />
@@ -43,7 +59,8 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/account" element={<Account />} />
           </Route>
-          <Route element={<ProtectedRoute roles={["customer"]} />}>
+          {/* Providers keep the bookings they made as customers */}
+          <Route element={<ProtectedRoute roles={["customer", "provider"]} />}>
             <Route path="/bookings" element={<MyBookings />} />
           </Route>
           <Route element={<ProtectedRoute roles={["provider"]} />}>
@@ -58,7 +75,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <footer className="mt-10 border-t border-line">
+      <footer className="mt-10 hidden border-t border-line md:block">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-sm text-muted">
           <span>
             © {YEAR} <span className="font-semibold text-fg">{APP_NAME}</span> · {APP_TAGLINE}
@@ -66,6 +83,7 @@ export default function App() {
           <span>Built with the MERN stack</span>
         </div>
       </footer>
+      <MobileTabBar />
       <Toaster
         position="top-center"
         toastOptions={{

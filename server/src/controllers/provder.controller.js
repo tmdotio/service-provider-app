@@ -5,6 +5,7 @@ import Category from "../models/category.model.js";
 import Post from "../models/post.model.js";
 import Review from "../models/review.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
+import { deleteImages, uploadImage } from "../services/imageStorage.service.js";
 import ApiError from "../utils/ApiError.js";
 import {
   escapeRegex,
@@ -386,6 +387,7 @@ export const searchProviders = async (req, res) => {
               totalReviews: 1,
               completedJobs: 1,
               noShowCount: 1,
+              "bannerImage.url": 1,
               "user._id": 1,
               "user.name": 1,
               "user.avatar": 1,
@@ -444,4 +446,65 @@ export const getProviderPublicProfile = async (req, res) => {
     latestReviews,
     postsCount,
   });
+};
+
+/**
+ * Upload or replace my banner (cover) image. Max 1 MB.
+ * The old banner is deleted from ImageKit.
+ *
+ * @route   PATCH /api/provider/me/banner   (multipart/form-data, field "image")
+ * @access  Private/Provider
+ */
+export const updateBanner = async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Please select an image");
+  }
+
+  const provider = await ServiceProvider.findOne({
+    user: req.user._id,
+    verificationStatus: "approved",
+  });
+
+  if (!provider) {
+    throw new ApiError(404, "Provider profile not found");
+  }
+
+  const oldBanner = provider.bannerImage?.fileId ? { ...provider.bannerImage } : null;
+  const image = await uploadImage(req.file, "banners");
+
+  provider.bannerImage = image;
+  await provider.save();
+
+  if (oldBanner) await deleteImages([oldBanner]);
+
+  res.status(200).json({
+    success: true,
+    message: "Banner updated",
+    bannerImage: provider.bannerImage,
+  });
+};
+
+/**
+ * Remove my banner image.
+ *
+ * @route   DELETE /api/provider/me/banner
+ * @access  Private/Provider
+ */
+export const removeBanner = async (req, res) => {
+  const provider = await ServiceProvider.findOne({
+    user: req.user._id,
+    verificationStatus: "approved",
+  });
+
+  if (!provider) {
+    throw new ApiError(404, "Provider profile not found");
+  }
+
+  if (provider.bannerImage?.fileId) {
+    await deleteImages([{ fileId: provider.bannerImage.fileId }]);
+  }
+  provider.bannerImage = { url: "", fileId: "" };
+  await provider.save();
+
+  res.status(200).json({ success: true, message: "Banner removed" });
 };

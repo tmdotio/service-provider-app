@@ -90,3 +90,25 @@ export const pngBuffer = (size = 200) => {
 };
 
 export const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+/**
+ * Customer books the provider, provider accepts and completes.
+ * Returns the completed booking id.
+ */
+export const completeJob = async ({ customer, provider, category }) => {
+  const created = await api()
+    .post(`/api/booking/${provider.providerId}`)
+    .set(auth(customer.token))
+    .send({
+      category: String(category._id),
+      description: "Please fix the kitchen cabinets",
+      serviceAddress: "Johar Town, Lahore",
+    });
+  if (created.status !== 201) throw new Error(JSON.stringify(created.body));
+  const id = created.body.booking._id;
+
+  await api().patch(`/api/booking/${id}/respond`).set(auth(provider.token)).send({ action: "accept" });
+  const done = await api().patch(`/api/booking/${id}/complete`).set(auth(provider.token));
+  if (done.status !== 200) throw new Error(JSON.stringify(done.body));
+  return id;
+};

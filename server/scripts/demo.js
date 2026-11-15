@@ -139,35 +139,62 @@ const svg = (text, color) =>
 
 const ahmedUser = await User.findOne({ email: "ahmed@demo.test" });
 const kashifUser = await User.findOne({ email: "kashif@demo.test" });
-await Post.create([
+const posts = await Post.create([
   {
     author: kashifUser._id,
     provider: providers[2]._id,
-    type: "showcase",
     text: "Finished this kitchen in Bahria Town last week. Solid wood, soft-close hinges.",
     images: [
-      { url: svg("Kitchen — before", "#9ca3af"), fileId: "demo1" },
-      { url: svg("Kitchen — after", "#059669"), fileId: "demo2" },
+      { url: svg("Old kitchen", "#6b7280"), fileId: "demo1", label: "before" },
+      { url: svg("New cabinets", "#059669"), fileId: "demo2", label: "after" },
     ],
   },
   {
-    author: customer._id,
+    author: ahmedUser._id,
     provider: providers[0]._id,
-    type: "experience",
-    text: "Ahmed rewired our whole lounge in one day. Clean work and no mess left behind!",
-    images: [{ url: svg("New wiring board", "#2563eb"), fileId: "demo3" }],
-    isVerifiedCustomer: true,
+    text: "Rewired a full lounge in Model Town in one day. The old board was burnt — replaced with a new DB and breakers.",
+    images: [
+      { url: svg("Burnt switchboard", "#7f1d1d"), fileId: "demo5", label: "before" },
+      { url: svg("New wiring board", "#2563eb"), fileId: "demo3", label: "after" },
+    ],
     likes: [customer2._id],
     likesCount: 1,
   },
   {
     author: ahmedUser._id,
     provider: providers[0]._id,
-    type: "showcase",
     text: "Split AC installed and gas refilled. Cooling like new.",
-    images: [{ url: svg("AC installation", "#0891b2"), fileId: "demo4" }],
+    images: [{ url: svg("AC installation", "#0891b2"), fileId: "demo4", label: "after" }],
   },
 ]);
+
+// Customers ask questions in the comments, providers reply
+const { default: Comment } = await import("../src/models/comment.model.js");
+const kitchenPost = posts[0];
+const question = await Comment.create({
+  post: kitchenPost._id,
+  author: customer._id,
+  text: "Beautiful! How long did this kitchen take?",
+});
+await Comment.create({
+  post: kitchenPost._id,
+  author: kashifUser._id,
+  parent: question._id,
+  text: "Thank you! About 6 days including polish.",
+});
+await Comment.create({
+  post: posts[1]._id,
+  author: customer2._id,
+  text: "Do you also install solar inverters?",
+});
+await Post.updateOne({ _id: kitchenPost._id }, { commentsCount: 2 });
+await Post.updateOne({ _id: posts[1]._id }, { commentsCount: 1 });
+
+// Banner for one provider, so the profile cover can be seen
+await ServiceProvider.updateOne(
+  { _id: providers[0]._id },
+  { bannerImage: { url: svg("Ahmed Electric Works", "#1e293b"), fileId: "demo-banner" } },
+);
 
 await mongoose.disconnect();
 

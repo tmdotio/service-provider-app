@@ -10,6 +10,7 @@ export const NOTIFICATION_TYPES = [
   "review_received",
   "post_liked",
   "post_commented",
+  "comment_replied",
   "post_removed",
   "provider_approved",
   "provider_rejected",

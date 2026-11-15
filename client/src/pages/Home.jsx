@@ -72,7 +72,7 @@ export default function Home() {
           <label className="flex flex-1 items-center gap-3 rounded-full bg-surface px-5 py-3">
             <Search className="h-5 w-5 shrink-0 text-muted" />
             <input
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+              className="w-full bg-transparent text-base outline-none placeholder:text-muted sm:text-sm"
               placeholder="What do you need? e.g. AC repair, leaking tap"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -82,7 +82,7 @@ export default function Home() {
           <label className="flex items-center gap-3 rounded-full bg-surface px-5 py-3 sm:w-56">
             <MapPin className="h-5 w-5 shrink-0 text-muted" />
             <input
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+              className="w-full bg-transparent text-base outline-none placeholder:text-muted sm:text-sm"
               placeholder="City"
               value={city}
               onChange={(e) => setCity(e.target.value)}

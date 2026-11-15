@@ -1,7 +1,8 @@
-import { ArrowUpRight, BadgeCheck, Briefcase, Camera, Clock, Loader2, Mail, Phone } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Briefcase, CalendarCheck, Camera, CheckCircle2, Circle, Clock, Loader2, LogOut, Mail, Phone } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
+import { logout } from "../store/authSlice";
 import { Link, useNavigate } from "react-router";
 import api, { getErrorMessage } from "../api/axios";
 import BecomeProviderModal from "../components/BecomeProviderModal";
@@ -10,6 +11,68 @@ import useAuth from "../hooks/useAuth";
 import useFetch from "../hooks/useFetch";
 import { fetchMe, updateUser } from "../store/authSlice";
 import { checkImageFile, timeAgo } from "../utils/format";
+
+/**
+ * New providers: a short checklist so the pro page looks good from day one.
+ * Each step ticks itself when it's done.
+ */
+function ProviderSetup() {
+  const { providerProfile: profile } = useAuth();
+  const posts = useFetch(
+    () => (profile ? api.get("/posts", { params: { provider: profile._id, limit: 1 } }) : Promise.resolve({ data: null })),
+    [profile?._id],
+  );
+
+  if (!profile) return null;
+
+  const steps = [
+    { done: Boolean(profile.bannerImage?.url), label: "Add a banner photo", to: "/provider?edit=1" },
+    { done: profile.availabilityStatus !== "offline", label: "Go online to get bookings", to: "/provider" },
+    { done: (posts.data?.pagination.total || 0) > 0, label: "Post your first before/after job", to: "/provider?section=posts" },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const allDone = doneCount === steps.length;
+
+  return (
+    <NotchCard to="/provider" cornerLabel="Open workspace" highlight={!allDone}>
+      <div className="pr-10">
+        <p className={`text-xs font-bold uppercase tracking-wider ${allDone ? "text-muted" : "opacity-70"}`}>
+          {allDone ? "Your workspace" : `Set up · ${doneCount}/${steps.length}`}
+        </p>
+        <h2 className="mt-1 font-wide text-2xl leading-tight">{allDone ? "You're all set" : "Welcome, pro!"}</h2>
+      </div>
+
+      {/* progress bar */}
+      <div className={`mt-4 h-1.5 overflow-hidden rounded-full ${allDone ? "bg-surface-2" : "bg-accent-ink/15"}`}>
+        <div
+          className={`h-full rounded-full transition-all ${allDone ? "bg-accent" : "bg-accent-ink"}`}
+          style={{ width: `${(doneCount / steps.length) * 100}%` }}
+        />
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {steps.map((step) => (
+          <li key={step.label}>
+            <Link
+              to={step.to}
+              className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition ${
+                allDone ? "hover:bg-surface-2" : "hover:bg-accent-ink/10"
+              }`}
+            >
+              {step.done ? (
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+              ) : (
+                <Circle className="h-5 w-5 shrink-0 opacity-50" />
+              )}
+              <span className={step.done ? "line-through opacity-60" : ""}>{step.label}</span>
+              {!step.done && <ArrowUpRight className="ml-auto h-4 w-4" />}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </NotchCard>
+  );
+}
 
 /** Right column for customers: apply / pending / approved */
 function ProviderSection() {
@@ -85,6 +148,13 @@ function ProviderSection() {
 export default function Account() {
   const { user, isCustomer, isProvider } = useAuth();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await dispatch(logout());
+    toast.success("Logged out");
+    navigate("/");
+  };
   const [form, setForm] = useState({ name: user.name, phone: user.phone || "" });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -133,10 +203,8 @@ export default function Account() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <div className="card overflow-hidden">
-          {/* Cover with gradient */}
-          <div className="h-28 bg-accent-gradient opacity-90" />
-          <div className="px-6 pb-6">
-            <div className="-mt-10 flex flex-wrap items-end gap-4">
+          <div className="p-6">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="relative">
                 <div className="rounded-full bg-surface p-1.5">
                   <Avatar user={user} size="h-24 w-24" />
@@ -166,10 +234,13 @@ export default function Account() {
                 <label className="label" htmlFor="phone">Phone</label>
                 <input id="phone" className="input" pattern="\+?[0-9]{10,15}" placeholder="03001234567" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
-              <div className="sm:col-span-2">
-                <button className="btn-primary" disabled={saving}>
+              <div className="flex flex-wrap justify-between gap-3 sm:col-span-2">
+                <button className="btn-primary h-12 px-6" disabled={saving}>
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   Save changes
+                </button>
+                <button type="button" onClick={handleLogout} className="btn-ghost h-12 text-rose-500 hover:text-rose-500">
+                  <LogOut className="h-4 w-4" /> Log out
                 </button>
               </div>
             </form>
@@ -178,14 +249,12 @@ export default function Account() {
 
         <div className="space-y-6">
           {isCustomer && <ProviderSection />}
+          {isProvider && <ProviderSetup />}
           {isProvider && (
-            <NotchCard to="/provider" cornerLabel="Open dashboard">
-              <Briefcase className="h-7 w-7 text-accent" />
-              <h2 className="mt-4 text-xl font-bold">Provider dashboard</h2>
-              <p className="mt-1 text-sm text-muted">Manage jobs, go online and post your work.</p>
-              <Link to="/provider" className="btn-outline mt-5">
-                Open dashboard <ArrowUpRight className="h-4 w-4" />
-              </Link>
+            <NotchCard to="/bookings" cornerLabel="Open bookings you made">
+              <CalendarCheck className="h-7 w-7 text-accent" />
+              <h2 className="mt-4 text-lg font-bold">Bookings you made</h2>
+              <p className="mt-1 text-sm text-muted">Jobs you booked from other pros, before or after becoming a provider.</p>
             </NotchCard>
           )}
         </div>

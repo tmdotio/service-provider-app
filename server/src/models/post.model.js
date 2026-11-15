@@ -4,15 +4,15 @@ const imageSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
     fileId: { type: String, required: true },
+    // "before" = condition before the job, "after" = finished work
+    label: { type: String, enum: ["before", "after"], default: "after" },
   },
   { _id: false },
 );
 
 /**
- * A post with images about a service provider's work.
- *
- * - type "showcase":   the provider posts photos of their own work
- * - type "experience": a customer shows how the provider worked
+ * A provider's post about their own work, with before/after photos.
+ * Only providers post; customers can comment and the provider replies.
  */
 const postSchema = new mongoose.Schema(
   {
@@ -26,12 +26,6 @@ const postSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "provider",
       required: [true, "Provider is required"],
-    },
-
-    type: {
-      type: String,
-      enum: ["showcase", "experience"],
-      required: true,
     },
 
     text: {
@@ -48,12 +42,6 @@ const postSchema = new mongoose.Schema(
         validator: (images) => images.length >= 1 && images.length <= 4,
         message: "A post must have 1 to 4 images",
       },
-    },
-
-    // Author had a completed booking with this provider
-    isVerifiedCustomer: {
-      type: Boolean,
-      default: false,
     },
 
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
