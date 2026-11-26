@@ -2,6 +2,7 @@ import multer from "multer";
 import ApiError from "../utils/ApiError.js";
 
 export const MAX_IMAGE_SIZE = 1 * 1024 * 1024; // 1 MB
+export const MAX_POST_IMAGE_SIZE = 5 * 1024 * 1024;
 export const MAX_POST_IMAGES = 4;
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -12,10 +13,10 @@ const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
  * FIX: the option is `limits` (with "s"). The old code used `limit`,
  * which multer ignores, so the 1 MB limit was never applied.
  */
-const upload = multer({
+const makeUpload = (fileSize) => multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: MAX_IMAGE_SIZE,
+    fileSize,
     files: MAX_POST_IMAGES,
   },
   fileFilter: (req, file, cb) => {
@@ -26,6 +27,8 @@ const upload = multer({
     }
   },
 });
+const upload = makeUpload(MAX_IMAGE_SIZE);
+const postUpload = makeUpload(MAX_POST_IMAGE_SIZE);
 
 /**
  * Check the real file type from its first bytes ("magic numbers").
@@ -64,19 +67,22 @@ export const verifyImageContent = (req, res, next) => {
 /** One image in the "image" field (avatar). */
 export const uploadSingleImage = [upload.single("image"), verifyImageContent];
 
-/** Posts: up to 2 "before" and 2 "after" images (4 total). */
+/** Up to 4 optional post photos; keep legacy before/after fields compatible. */
 export const uploadPostImages = [
-  upload.fields([
+  (req, res, next) => { req.maxImageMB = 5; next(); },
+  postUpload.fields([
+    { name: "images", maxCount: MAX_POST_IMAGES },
     { name: "before", maxCount: 2 },
     { name: "after", maxCount: 2 },
   ]),
   // multer.fields gives { before: [...], after: [...] }; keep both and a flat list
   (req, res, next) => {
     req.postFiles = {
+      images: req.files?.images || [],
       before: req.files?.before || [],
       after: req.files?.after || [],
     };
-    req.files = [...req.postFiles.before, ...req.postFiles.after];
+    req.files = [...req.postFiles.images, ...req.postFiles.before, ...req.postFiles.after];
     next();
   },
   verifyImageContent,

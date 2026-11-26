@@ -49,19 +49,35 @@ describe("Posts", () => {
     expect(uploadImages).not.toHaveBeenCalled();
   });
 
-  it("needs at least one after photo", async () => {
-    const res = await createPost(provider, { before: 1, after: 0 });
+  it("allows a text-only post (photos are optional)", async () => {
+    const res = await createPost(provider, { after: 0, text: "20% off AC servicing this week" });
+    expect(res.status).toBe(201);
+    expect(res.body.post.images).toEqual([]);
+  });
+
+  it("accepts up to 4 photos in the images field, labelled photo", async () => {
+    const req = api().post("/api/posts").set(auth(provider.token)).field("text", "New workshop photos");
+    for (let i = 0; i < 4; i += 1) req.attach("images", ...png(`photo${i}.png`));
+    const res = await req;
+    expect(res.status).toBe(201);
+    expect(res.body.post.images.map((i) => i.label)).toEqual(["photo", "photo", "photo", "photo"]);
+  });
+
+  it("rejects more than 4 photos in the images field", async () => {
+    const req = api().post("/api/posts").set(auth(provider.token)).field("text", "Too many photos");
+    for (let i = 0; i < 5; i += 1) req.attach("images", ...png(`photo${i}.png`));
+    const res = await req;
     expect(res.status).toBe(400);
   });
 
-  it("rejects images larger than 1 MB", async () => {
+  it("rejects post images larger than 5 MB", async () => {
     const res = await api()
       .post("/api/posts")
       .set(auth(provider.token))
       .field("text", "Too big image")
-      .attach("after", pngBuffer(1024 * 1024 + 10), { filename: "big.png", contentType: "image/png" });
+      .attach("images", pngBuffer(5 * 1024 * 1024 + 10), { filename: "big.png", contentType: "image/png" });
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/1 MB/);
+    expect(res.body.message).toMatch(/5 MB/);
   });
 
   it("rejects more than 2 photos per side", async () => {
@@ -89,7 +105,7 @@ describe("Posts", () => {
     expect(uploadImages).not.toHaveBeenCalled();
   });
 
-  it("customer comments, only the post's provider can reply, and the customer is notified", async () => {
+  it("anyone can reply in a thread, and each person is notified with a link to the post", async () => {
     const { body } = await createPost(provider);
     const postId = body.post._id;
 
@@ -100,35 +116,46 @@ describe("Posts", () => {
     expect(comment.status).toBe(201);
     const commentId = comment.body.comment._id;
 
-    // Another customer cannot reply as if they were the provider
-    const other = await createCustomer();
-    const fake = await api()
-      .post(`/api/posts/${postId}/comments`)
-      .set(auth(other.token))
-      .send({ text: "I can do it cheaper", parentId: commentId });
-    expect(fake.status).toBe(403);
-
     const reply = await api()
       .post(`/api/posts/${postId}/comments`)
       .set(auth(provider.token))
       .send({ text: "Around 80k, message me!", parentId: commentId });
     expect(reply.status).toBe(201);
 
-    // Replies are one level deep: no reply to a reply
-    const nested = await api()
+    // The customer answers the provider's reply: it joins the same thread
+    const back = await api()
       .post(`/api/posts/${postId}/comments`)
-      .set(auth(provider.token))
-      .send({ text: "again", parentId: reply.body.comment._id });
-    expect(nested.status).toBe(404);
+      .set(auth(customer.token))
+      .send({ text: "Can you do 70k?", parentId: reply.body.comment._id });
+    expect(back.status).toBe(201);
+    expect(back.body.comment.parent).toBe(commentId);
+    expect(back.body.comment.replyTo.name).toBe("Provider");
+
+    // Someone else can join the conversation too
+    const other = await createCustomer();
+    const third = await api()
+      .post(`/api/posts/${postId}/comments`)
+      .set(auth(other.token))
+      .send({ text: "I want the same", parentId: commentId });
+    expect(third.status).toBe(201);
 
     const list = await api().get(`/api/posts/${postId}/comments`);
     expect(list.body.comments).toHaveLength(1);
-    expect(list.body.comments[0].replies[0].text).toBe("Around 80k, message me!");
+    expect(list.body.comments[0].replies.map((r) => r.text)).toEqual([
+      "Around 80k, message me!",
+      "Can you do 70k?",
+      "I want the same",
+    ]);
 
     const notes = await api().get("/api/notifications").set(auth(customer.token));
-    expect(notes.body.notifications.map((n) => n.type)).toContain("comment_replied");
+    const replied = notes.body.notifications.find((n) => n.type === "comment_replied");
+    expect(replied.data.post).toBe(postId);
+    expect(replied.data.comment).toBeTruthy();
 
-    // Deleting the comment also deletes its reply
+    const providerNotes = await api().get("/api/notifications").set(auth(provider.token));
+    expect(providerNotes.body.notifications.filter((n) => n.type === "comment_replied")).toHaveLength(1);
+
+    // Deleting the comment also deletes its replies
     await api().delete(`/api/posts/${postId}/comments/${commentId}`).set(auth(customer.token));
     expect((await Post.findById(postId)).commentsCount).toBe(0);
   });

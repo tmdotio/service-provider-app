@@ -3,16 +3,35 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import api from "../api/axios";
 import useAuth from "../hooks/useAuth";
+import { useSocketEvent } from "../hooks/useChat";
 import { timeAgo } from "../utils/format";
 
 const POLL_MS = 30000;
 
+// Notifications a provider gets about their own jobs (older ones have no "side")
+const PROVIDER_TYPES = ["booking_created", "booking_cancelled", "booking_no_show", "review_received"];
+// Which tab of the provider's Workspace / customer's Bookings to open
+// (a cancelled booking is not listed anywhere, so that one opens the default view)
+const PROVIDER_TAB = { booking_created: "requests", booking_no_show: "history" };
+const CUSTOMER_PAST = ["booking_completed", "booking_rejected"];
+
 /** Where to go when a notification is clicked. */
 const linkFor = (n, role) => {
   if (n.type.startsWith("booking_") || n.type === "review_received") {
-    return role === "provider" ? "/provider" : "/bookings";
+    const side = n.data?.side || (role === "provider" && PROVIDER_TYPES.includes(n.type) ? "provider" : "customer");
+    if (side === "provider") {
+      if (n.type === "review_received") return "/provider?section=reviews";
+      if (n.type === "booking_cancelled") return "/provider?section=jobs";
+      return `/provider?section=jobs&tab=${PROVIDER_TAB[n.type] || "active"}`;
+    }
+    if (n.type === "booking_cancelled") return "/bookings";
+    return `/bookings?tab=${CUSTOMER_PAST.includes(n.type) ? "past" : "active"}`;
   }
-  if (n.type.startsWith("post_") || n.type === "comment_replied") return "/feed";
+  if (n.type === "post_removed") return "/feed";
+  if (n.type.startsWith("post_") || n.type === "comment_replied") {
+    if (!n.data?.post) return "/feed";
+    return `/posts/${n.data.post}${n.data.comment ? `?comment=${n.data.comment}` : ""}`;
+  }
   if (n.type.startsWith("provider_")) return role === "provider" ? "/provider" : "/account";
   return "/";
 };
@@ -50,6 +69,15 @@ export default function NotificationBell() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  // New notifications arrive live over the socket (polling stays as a backup)
+  useSocketEvent(
+    "notification:new",
+    useCallback((n) => {
+      setItems((list) => [n, ...list.filter((x) => x._id !== n._id)].slice(0, 10));
+      setUnread((u) => u + 1);
+    }, []),
+  );
 
   const markAllRead = async () => {
     await api.patch("/notifications/read-all");

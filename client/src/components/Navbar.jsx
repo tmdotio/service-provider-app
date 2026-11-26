@@ -1,8 +1,9 @@
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, MessageCircle, Moon, Sun } from "lucide-react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { Link, NavLink, useNavigate } from "react-router";
 import useAuth from "../hooks/useAuth";
+import { useChatUnread } from "../hooks/useChat";
 import useNavLinks from "../hooks/useNavLinks";
 import useTheme from "../hooks/useTheme";
 import { logout } from "../store/authSlice";
@@ -23,6 +24,25 @@ export function Logo({ to = "/" }) {
       </span>
       <span className="hidden min-[360px]:inline">{APP_NAME}</span>
     </Link>
+  );
+}
+
+/** Chat icon with the number of unread messages. */
+function MessagesLink() {
+  const unread = useChatUnread();
+  return (
+    <NavLink
+      to="/messages"
+      className={({ isActive }) => `icon-btn relative h-10 w-10 ${isActive ? "!bg-fg !text-bg" : ""}`}
+      aria-label={`Messages${unread ? ` (${unread} unread)` : ""}`}
+    >
+      <MessageCircle className="h-[18px] w-[18px]" />
+      {unread > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink ring-2 ring-surface">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </NavLink>
   );
 }
 
@@ -65,6 +85,7 @@ export default function Navbar() {
           </button>
           {user ? (
             <>
+              {user.role !== "admin" && <MessagesLink />}
               <NotificationBell />
               <Link to="/account" className="flex items-center gap-2 rounded-full p-0.5 transition hover:bg-surface-2 sm:py-1 sm:pl-1 sm:pr-3" aria-label="My profile">
                 <Avatar user={user} size="h-9 w-9" />

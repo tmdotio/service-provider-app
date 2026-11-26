@@ -106,7 +106,7 @@ export default function Home() {
         ) : (
           <div key={filter} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {topProviders.data?.providers.map((p, i) => (
-              <div key={p._id} className="animate-rise" style={{ animationDelay: `${i * 70}ms` }}>
+              <div key={p._id} className="h-full animate-rise" style={{ animationDelay: `${i * 70}ms` }}>
                 <ProviderCard provider={p} />
               </div>
             ))}

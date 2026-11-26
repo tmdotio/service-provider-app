@@ -1,0 +1,15 @@
+# Dependencies and builds (each app also has its own .gitignore)
+node_modules/
+dist/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Local load-test output
+redis-test.json
+
+# OS / editor
+.DS_Store
+Thumbs.db

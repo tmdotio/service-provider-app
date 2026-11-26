@@ -34,9 +34,9 @@ postRoute.get("/", optionalAuth, getPosts);
 
 /**
  * @route   POST /api/posts   (multipart/form-data)
- * @desc    Provider posts their own work: before[] (0-2) + after[] (1-2) photos, each < 1 MB
+ * @desc    Provider work updates or promotions: up to 4 optional photos, each up to 5 MB
  * @access  Private/Provider
- * @body    text, before (files), after (files)
+ * @body    text, images (files); legacy before/after fields also supported
  */
 postRoute.post(
   "/",

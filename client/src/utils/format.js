@@ -34,15 +34,16 @@ export const initials = (name = "") =>
 
 export const MAX_IMAGE_MB = 1;
 export const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+export const MAX_POST_IMAGE_MB = 5;
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Returns an error message, or null if the file is OK. */
-export const checkImageFile = (file) => {
+export const checkImageFile = (file, maxMB = MAX_IMAGE_MB) => {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return `${file.name}: only JPG, PNG or WEBP images are allowed`;
   }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. Max is ${MAX_IMAGE_MB} MB.`;
+  if (file.size > maxMB * 1024 * 1024) {
+    return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. Max is ${maxMB} MB.`;
   }
   return null;
 };

@@ -3,11 +3,27 @@ import mongoose from "mongoose";
 import ServiceProvider from "../models/serviceProvider.model.js";
 import Booking from "../models/booking.model.js";
 import { notify } from "../services/notification.service.js";
+import { invalidateProviders } from "../services/cache.service.js";
+import { closeChatIfBookingEnded } from "../services/chat.service.js";
+import { emitToUser } from "../socket/emitter.js";
 import ApiError from "../utils/ApiError.js";
 import { getPagination, paginationMeta } from "../utils/pagination.js";
 
 // Customer can report "provider did not come" this long after accept
 export const NO_SHOW_AFTER_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Tell both people's open screens that a booking changed, so the
+ * customer's Bookings page and the provider's Workspace refresh live
+ * (status, busy/available) without a page reload.
+ */
+const pushBookingUpdate = async (booking, { customerId, providerUserId }) => {
+  // A finished booking's chat is deleted with all its messages
+  await closeChatIfBookingEnded(booking);
+  const payload = { bookingId: String(booking._id), status: booking.status };
+  emitToUser(customerId, "booking:updated", { ...payload, side: "customer" });
+  emitToUser(providerUserId, "booking:updated", { ...payload, side: "provider" });
+};
 
 /**
  * Create a new service booking.
@@ -105,8 +121,9 @@ export const createBooking = async (req, res) => {
       provider.user._id,
       "booking_created",
       `${req.user.name} sent you a new booking request`,
-      { booking: booking._id },
+      { booking: booking._id, side: "provider" },
     );
+    await pushBookingUpdate(booking, { customerId, providerUserId: provider.user._id });
 
     return res.status(201).json({
       success: true,
@@ -134,8 +151,10 @@ export const createBooking = async (req, res) => {
  */
 export const getMyBookings = async (req, res) => {
   try {
+    // Cancelled bookings are not listed: both people only get a notification
     const bookings = await Booking.find({
       customer: req.user._id,
+      status: { $ne: "cancelled" },
     })
       .populate({
         path: "provider",
@@ -191,18 +210,36 @@ export const getProviderBookings = async (req, res) => {
     }
 
     // 2. Get bookings assigned to this provider
+    // Cancelled bookings are not listed: both people only get a notification
     const bookings = await Booking.find({
       provider: provider._id,
+      status: { $ne: "cancelled" },
     })
       .populate("customer", "name email phone avatar")
       .populate("category", "name")
       .sort({ createdAt: -1 })
       .lean();
 
+    // Repair: "busy" with no job in progress (e.g. data from an older
+    // version, or a crash between two writes) would block the provider
+    // forever, so make them available again.
+    let { availabilityStatus } = provider;
+    if (availabilityStatus === "busy" && !bookings.some((b) => b.status === "in_progress")) {
+      const repaired = await ServiceProvider.updateOne(
+        { _id: provider._id, availabilityStatus: "busy" },
+        { $set: { availabilityStatus: "available" } },
+      );
+      if (repaired.modifiedCount) {
+        availabilityStatus = "available";
+        await invalidateProviders().catch(() => {});
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "Provider bookings fetched successfully",
       totalBookings: bookings.length,
+      availabilityStatus,
       bookings,
     });
   } catch (error) {
@@ -287,7 +324,9 @@ export const respondToBooking = async (req, res) => {
 
           if (!reservedProvider) {
             const error = new Error(
-              "Provider is not available to accept bookings"
+              provider.availabilityStatus === "busy"
+                ? "You already have a job in progress. Mark it done or cancel it first."
+                : "You are offline. Go online to accept bookings."
             );
             error.statusCode = 409;
             throw error;
@@ -330,8 +369,9 @@ export const respondToBooking = async (req, res) => {
         action === "accept"
           ? `${req.user.name} accepted your booking and is on the way`
           : `${req.user.name} could not accept your booking`,
-        { booking: updatedBooking._id },
+        { booking: updatedBooking._id, side: "customer" },
       );
+      await pushBookingUpdate(updatedBooking, { customerId: updatedBooking.customer, providerUserId: req.user._id });
 
       return res.status(200).json({
         success: true,
@@ -467,8 +507,9 @@ export const markBookingComplete = async (req, res) => {
       booking.customer,
       "booking_completed",
       `${req.user.name} completed your job. Please leave a review!`,
-      { booking: booking._id },
+      { booking: booking._id, side: "customer" },
     );
+    await pushBookingUpdate(booking, { customerId: booking.customer, providerUserId: req.user._id });
 
     // 5. Return successful response
     return res.status(200).json({
@@ -627,9 +668,11 @@ export const cancelBooking = async (req, res) => {
   await notify(
     isCustomer ? booking.provider.user : booking.customer,
     "booking_cancelled",
-    `${req.user.name} cancelled the booking. Reason: ${reason}`,
-    { booking: booking._id },
+    // Just the news, nothing more: the booking disappears from both lists
+    `Your booking with ${req.user.name} has been cancelled`,
+    { booking: booking._id, side: isCustomer ? "provider" : "customer" },
   );
+  await pushBookingUpdate(updated, { customerId: booking.customer, providerUserId: booking.provider.user });
 
   res.status(200).json({
     success: true,
@@ -698,8 +741,9 @@ export const reportNoShow = async (req, res) => {
     booking.provider.user,
     "booking_no_show",
     `${req.user.name} reported that you did not show up`,
-    { booking: booking._id },
+    { booking: booking._id, side: "provider" },
   );
+  await pushBookingUpdate(updated, { customerId: booking.customer, providerUserId: booking.provider.user });
 
   res.status(200).json({
     success: true,

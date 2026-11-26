@@ -103,6 +103,56 @@ npm install
 npm run dev               # http://localhost:5173 (calls /api on port 5001)
 ```
 
+### Deploy on Render (one Web Service)
+
+Express serves the API, the live chat (Socket.IO) and the built React app
+from one URL, so login cookies and the chat work without extra setup.
+
+1. Push this repository to GitHub, then on Render: **New → Web Service**.
+2. Settings:
+   - Root directory: *(leave empty — the repository root)*
+   - Build command: `npm run build`
+   - Start command: `npm start`
+   - Node version comes from `engines` (20.19 or newer).
+3. Environment variables:
+   - `NODE_ENV=production` (secure cookies)
+   - `MONGO_URI` — MongoDB Atlas; in Atlas → Network Access allow `0.0.0.0/0`
+   - `ACCESS_TOKEN_SECRETE`, `REFRESH_TOKEN_SECRETE` — long random strings
+   - `IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`
+   - `REDIS_URL` — optional (Render Key Value); the app works without it
+   - `CLIENT_URL` — only if another site also calls this API
+4. After the first deploy, create the admin once from the Render Shell:
+   `cd server && npm run seed` (uses `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+
+Notes: the free plan sleeps after 15 minutes without visitors (the first
+request then takes a while, and open chats reconnect by themselves).
+`TRUST_PROXY` (default `1`) tells Express how many proxies sit in front of it.
+
+### Live chat (Socket.IO)
+
+A customer and a provider who have a booking together can message each other
+one-on-one. Press **Message** on a booking card (customer: Bookings page,
+provider: Workspace), or open the chat icon in the top bar.
+
+- Messages arrive live, with a typing indicator, ✓ sent / ✓✓ seen ticks,
+  an unread badge in the top bar and a popup when another chat gets a message.
+- One conversation per customer + provider pair; every booking between them
+  shares the same history.
+- The Socket.IO server runs on the same port as the API. In development Vite
+  forwards `/socket.io` to it. Set `VITE_SOCKET_URL` if the API lives on
+  another domain.
+- REST fallback: `GET/POST /api/chats`, `GET/POST /api/chats/:id/messages`,
+  `PATCH /api/chats/:id/read`, `GET /api/chats/unread-count`.
+
+### Persistent test accounts
+
+To add persistent test users to the database configured in `server/.env`, run
+`npm run seed:users` from `server`. This creates 30 customers and 20 approved,
+available providers across 10 services and 5 cities. Login details and fictional
+phone numbers are saved to `server/generated/seed-accounts.md` (excluded from Git).
+Rerunning preserves existing users, passwords, and provider profiles. This command
+does not create bookings or reviews and refuses to run in production mode.
+
 ### Demo mode (no setup needed)
 
 ```bash

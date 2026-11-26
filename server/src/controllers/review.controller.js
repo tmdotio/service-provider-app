@@ -16,10 +16,9 @@ import { getPagination, paginationMeta } from "../utils/pagination.js";
  * @body    rating (1-5), comment?
  */
 export const createReview = async (req, res) => {
-  const booking = await Booking.findById(req.params.bookingId).populate(
-    "provider",
-    "user",
-  );
+  const booking = await Booking.findById(req.params.bookingId)
+    .populate("provider", "user")
+    .populate("category", "name");
 
   if (!booking) {
     throw new ApiError(404, "Booking not found");
@@ -46,6 +45,7 @@ export const createReview = async (req, res) => {
       booking: booking._id,
       customer: req.user._id,
       provider: booking.provider._id,
+      category: booking.category?._id || null,
       rating: req.body.rating,
       comment: req.body.comment,
     });
@@ -63,9 +63,11 @@ export const createReview = async (req, res) => {
   await notify(
     booking.provider.user,
     "review_received",
-    `${req.user.name} gave you ${review.rating} star${review.rating > 1 ? "s" : ""}`,
-    { booking: booking._id },
+    `${req.user.name} gave your ${booking.category?.name ? `${booking.category.name} ` : ""}service ${review.rating} star${review.rating > 1 ? "s" : ""}`,
+    { booking: booking._id, side: "provider" },
   );
+
+  await review.populate("category", "name");
 
   res.status(201).json({
     success: true,
@@ -75,11 +77,13 @@ export const createReview = async (req, res) => {
 };
 
 /**
- * Reviews of a provider, with a star breakdown (how many 5★, 4★...).
+ * Reviews of a provider, with a star breakdown (how many 5★, 4★...)
+ * and a per-service summary ("Electrician 4.8 from 3 reviews").
+ * Every review carries the service it was for (review.category.name).
  *
  * @route   GET /api/provider/:id/reviews
  * @access  Public
- * @query   rating?, page, limit
+ * @query   rating?, service? (category id), page, limit
  */
 export const getProviderReviews = async (req, res) => {
   const providerId = new mongoose.Types.ObjectId(String(req.params.id));
@@ -89,6 +93,10 @@ export const getProviderReviews = async (req, res) => {
   if (req.query.rating) {
     filter.rating = Number(req.query.rating);
   }
+  if (req.query.service) {
+    if (!mongoose.isValidObjectId(req.query.service)) throw new ApiError(400, "Invalid service");
+    filter.category = new mongoose.Types.ObjectId(String(req.query.service));
+  }
 
   // Cached in Redis; cleared automatically when reviews change
   const cache = {};
@@ -96,17 +104,26 @@ export const getProviderReviews = async (req, res) => {
     `reviews:${req.params.id}:${stableQueryKey(req.query)}`,
     300,
     async () => {
-      const [reviews, total, breakdownRaw] = await Promise.all([
+      const [reviews, total, breakdownRaw, services] = await Promise.all([
         Review.find(filter)
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .populate("customer", "name avatar")
+          .populate("category", "name")
           .lean(),
         Review.countDocuments(filter),
         Review.aggregate([
           { $match: { provider: providerId } },
           { $group: { _id: "$rating", count: { $sum: 1 } } },
+        ]),
+        Review.aggregate([
+          { $match: { provider: providerId, category: { $ne: null } } },
+          { $group: { _id: "$category", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+          { $lookup: { from: "categories", localField: "_id", foreignField: "_id", as: "category" } },
+          { $unwind: "$category" },
+          { $project: { _id: 1, name: "$category.name", count: 1, averageRating: { $round: ["$averageRating", 1] } } },
+          { $sort: { count: -1, name: 1 } },
         ]),
       ]);
 
@@ -115,7 +132,7 @@ export const getProviderReviews = async (req, res) => {
         breakdown[item._id] = item.count;
       }
 
-      return { reviews, breakdown, pagination: paginationMeta(total, page, limit) };
+      return { reviews, breakdown, services, pagination: paginationMeta(total, page, limit) };
     },
     cache,
   );

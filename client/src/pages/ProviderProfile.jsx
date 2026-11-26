@@ -6,6 +6,7 @@ import api, { getErrorMessage } from "../api/axios";
 import CreatePostForm from "../components/CreatePostForm";
 import PostCard from "../components/PostCard";
 import {
+  ServiceTag,
   Avatar,
   Chips,
   Img,
@@ -95,21 +96,46 @@ function BookingModal({ provider, open, onClose }) {
 
 function Reviews({ providerId }) {
   const [page, setPage] = useState(1);
+  const [service, setService] = useState(""); // "" = all services
   const { data, loading } = useFetch(
-    () => api.get(`/provider/${providerId}/reviews`, { params: { page, limit: 5 } }),
-    [providerId, page],
-    `reviews:${providerId}:${page}`,
+    () => api.get(`/provider/${providerId}/reviews`, { params: { page, limit: 5, ...(service && { service }) } }),
+    [providerId, page, service],
+    `reviews:${providerId}:${service}:${page}`,
   );
 
   if (loading && !data) return <Spinner />;
   const total = data?.pagination.total || 0;
+  const services = data?.services || [];
+  const allTotal = Object.values(data?.breakdown || {}).reduce((a, b) => a + b, 0);
 
-  if (total === 0) {
+  if (allTotal === 0) {
     return <EmptyState icon={MessageSquareQuote} title="No reviews yet" text="Reviews appear after completed bookings." />;
   }
 
   return (
     <div className="space-y-4">
+      {/* Rating per service: "Electrician ★ 4.8 · 3 reviews" — tap to filter */}
+      {services.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {[{ _id: "", name: "All services", count: allTotal }, ...services].map((s) => (
+            <button
+              key={s._id || "all"}
+              type="button"
+              onClick={() => {
+                setService(s._id);
+                setPage(1);
+              }}
+              className={`chip ${service === s._id ? "chip-active" : ""}`}
+              aria-pressed={service === s._id}
+            >
+              {s.name}
+              {s.averageRating != null && <span className="opacity-80">★ {s.averageRating.toFixed(1)}</span>}
+              <span className="opacity-60">· {s.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="card space-y-1.5 p-4">
         {[5, 4, 3, 2, 1].map((n) => {
           const count = data.breakdown[n] || 0;
@@ -117,7 +143,7 @@ function Reviews({ providerId }) {
             <div key={n} className="flex items-center gap-3 text-sm">
               <span className="w-8 text-muted">{n} ★</span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full bg-accent" style={{ width: `${(count / total) * 100}%` }} />
+                <div className="h-full bg-accent" style={{ width: `${(count / allTotal) * 100}%` }} />
               </div>
               <span className="w-6 text-right text-muted">{count}</span>
             </div>
@@ -135,7 +161,8 @@ function Reviews({ providerId }) {
             </div>
             <Stars value={r.rating} />
           </div>
-          {r.comment && <p className="mt-3 text-sm text-fg/80">{r.comment}</p>}
+          <ServiceTag name={r.category?.name} className="mt-3" />
+          {r.comment && <p className="mt-2 text-sm text-fg/80">{r.comment}</p>}
           {r.providerReply?.text && (
             <div className="mt-3 rounded-2xl bg-surface-2 p-3 text-sm">
               <p className="text-xs font-medium text-muted">Reply from provider</p>
@@ -144,6 +171,8 @@ function Reviews({ providerId }) {
           )}
         </div>
       ))}
+
+      {total === 0 && <p className="py-6 text-center text-sm text-muted">No reviews for this service yet.</p>}
 
       <Pagination pagination={data.pagination} onPage={setPage} />
     </div>

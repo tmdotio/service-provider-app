@@ -2,7 +2,9 @@ import Booking from "../models/booking.model.js";
 import Post from "../models/post.model.js";
 import Report from "../models/report.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
+import { deleteChatsOfUser } from "../services/chat.service.js";
 import { notify } from "../services/notification.service.js";
+import { disconnectUser } from "../socket/emitter.js";
 import ApiError from "../utils/ApiError.js";
 import { getPagination, paginationMeta } from "../utils/pagination.js";
 import User from "../models/user.model.js";
@@ -145,22 +147,35 @@ export const reviewProviderRequest = async (req, res) => {
  * Fetches all users from the database while excluding
  * sensitive fields such as password and refresh token.
  *
- * @route   GET /api/admin/users
+ * @route   GET /api/admin/users?q=&role=&status=&page=&limit=
  * @access  Private/Admin
- * @returns All registered users
+ * @query   q (name or email), role (customer|provider), status (active|inactive)
+ * @returns One page of users (newest first) + pagination
  */
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({
-      role: { $ne: "admin" },
-    })
-      .select("-password -refreshToken")
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = getPagination(req.query, 20, 100);
+    const filter = { role: { $ne: "admin" } };
+    if (["customer", "provider"].includes(req.query.role)) filter.role = req.query.role;
+    if (req.query.status === "active") filter.isActive = true;
+    if (req.query.status === "inactive") filter.isActive = false;
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    if (q) {
+      // Escape regex characters so a search like "a+b" is taken literally
+      const safe = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: safe }, { email: safe }];
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(filter).select("-password -refreshToken").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      User.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       count: users.length,
       users,
+      pagination: paginationMeta(total, page, limit),
     });
   } catch (error) {
     console.error("Get All Users Error:", error);
@@ -476,7 +491,9 @@ export const deleteUserByAdmin = async (req, res) => {
       });
     }
 
+    await deleteChatsOfUser(user._id);
     await User.findByIdAndDelete(user._id);
+    disconnectUser(user._id); // their open tabs lose the live chat at once
 
     return res.status(200).json({
       success: true,
@@ -524,9 +541,8 @@ export const updateUserStatus = async (req, res) => {
         _id: id,
         role: { $ne: "admin" },
       },
-      {
-        isActive,
-      },
+      // Deactivating also signs them out everywhere (no new access tokens)
+      isActive ? { isActive } : { isActive, refreshToken: null },
       {
         returnDocument: "after",
         runValidators: true,
@@ -539,6 +555,9 @@ export const updateUserStatus = async (req, res) => {
         message: "User not found",
       });
     }
+
+    // A deactivated user must not keep chatting through an open socket
+    if (!isActive) disconnectUser(user._id);
 
     return res.status(200).json({
       success: true,

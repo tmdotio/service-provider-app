@@ -44,19 +44,19 @@ const findVisiblePost = async (postId) => {
 };
 
 /**
- * Provider posts their own work with before/after photos.
+ * Provider shares work updates or promotions with optional photos.
  * Only approved providers can post, and only on their own profile.
  * Customers take part through comments.
  *
- * Images: up to 2 "before" + up to 2 "after" (at least 1 after), each < 1 MB.
+ * Images: up to 4 optional photos, each up to 5 MB. Legacy labels are supported.
  *
  * @route   POST /api/posts   (multipart/form-data)
  * @access  Private/Provider
- * @body    text, files: before[], after[]
+ * @body    text, files: images[], before[], after[]
  */
 export const createPost = async (req, res) => {
   const { text } = req.body;
-  const { before = [], after = [] } = req.postFiles || {};
+  const { images: photos = [], before = [], after = [] } = req.postFiles || {};
 
   const provider = await ServiceProvider.findOne({
     user: req.user._id,
@@ -65,10 +65,6 @@ export const createPost = async (req, res) => {
 
   if (!provider) {
     throw new ApiError(403, "Only approved providers can post their work");
-  }
-
-  if (after.length === 0) {
-    throw new ApiError(400, "Please add at least one photo of the finished work");
   }
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -81,11 +77,13 @@ export const createPost = async (req, res) => {
   }
 
   // Upload only after all checks pass
-  const [beforeImages, afterImages] = await Promise.all([
+  const [photoImages, beforeImages, afterImages] = await Promise.all([
+    uploadImages(photos, "posts"),
     uploadImages(before, "posts"),
     uploadImages(after, "posts"),
   ]);
   const images = [
+    ...photoImages.map((img) => ({ ...img, label: "photo" })),
     ...beforeImages.map((img) => ({ ...img, label: "before" })),
     ...afterImages.map((img) => ({ ...img, label: "after" })),
   ];
@@ -270,7 +268,7 @@ export const toggleLike = async (req, res) => {
 };
 
 /**
- * Comments of a post (newest first), each with the provider's replies.
+ * Comments of a post (newest first), each with its thread of replies.
  *
  * @route   GET /api/posts/:id/comments
  * @access  Public
@@ -295,6 +293,7 @@ export const getComments = async (req, res) => {
   const replies = await Comment.find({ parent: { $in: comments.map((c) => c._id) } })
     .sort({ createdAt: 1 })
     .populate("author", "name avatar role")
+    .populate("replyTo", "name")
     .lean();
 
   const repliesByParent = {};
@@ -310,10 +309,12 @@ export const getComments = async (req, res) => {
 };
 
 /**
- * Add a comment, or (provider only) reply to a comment.
+ * Add a comment, or reply inside a comment's thread.
  *
  * - Anyone logged in can comment on a post.
- * - Only the provider who made the post can reply (parentId).
+ * - Anyone logged in can reply. parentId may be the top-level comment or
+ *   a reply in its thread; the reply is stored under the top-level comment
+ *   (threads stay one level deep) and remembers who it answers (replyTo).
  *
  * @route   POST /api/posts/:id/comments
  * @access  Private
@@ -322,45 +323,52 @@ export const getComments = async (req, res) => {
 export const addComment = async (req, res) => {
   const post = await findVisiblePost(req.params.id);
   const { text, parentId } = req.body;
+  const me = req.user._id;
 
-  let parent = null;
+  let thread = null; // top-level comment
+  let target = null; // comment being answered
   if (parentId) {
-    if (!post.author.equals(req.user._id)) {
-      throw new ApiError(403, "Only the provider who posted this can reply to comments");
+    target = await Comment.findOne({ _id: parentId, post: post._id });
+    if (!target) {
+      throw new ApiError(404, "Comment to reply to was not found");
     }
-
-    parent = await Comment.findOne({ _id: parentId, post: post._id, parent: null });
-    if (!parent) {
+    thread = target.parent ? await Comment.findById(target.parent) : target;
+    if (!thread) {
       throw new ApiError(404, "Comment to reply to was not found");
     }
   }
 
   const comment = await Comment.create({
     post: post._id,
-    author: req.user._id,
-    parent: parent?._id || null,
+    author: me,
+    parent: thread?._id || null,
+    replyTo: target?.author || null,
     text,
   });
 
   await Post.findByIdAndUpdate(post._id, { $inc: { commentsCount: 1 } });
 
-  if (parent) {
-    if (!parent.author.equals(req.user._id)) {
-      await notify(parent.author, "comment_replied", `${req.user.name} replied to your comment`, {
-        post: post._id,
-      });
+  const data = { post: post._id, comment: comment._id };
+  if (target) {
+    if (!target.author.equals(me)) {
+      await notify(target.author, "comment_replied", `${req.user.name} replied to your comment`, data);
     }
-  } else if (!post.author.equals(req.user._id)) {
-    await notify(post.author, "post_commented", `${req.user.name} commented on your post`, {
-      post: post._id,
-    });
+    // The provider hears about conversations on their post too
+    if (!post.author.equals(me) && !post.author.equals(target.author)) {
+      await notify(post.author, "post_commented", `${req.user.name} replied in a conversation on your post`, data);
+    }
+  } else if (!post.author.equals(me)) {
+    await notify(post.author, "post_commented", `${req.user.name} commented on your post`, data);
   }
 
-  await comment.populate("author", "name avatar role");
+  await comment.populate([
+    { path: "author", select: "name avatar role" },
+    { path: "replyTo", select: "name" },
+  ]);
 
   res.status(201).json({
     success: true,
-    message: parent ? "Reply added" : "Comment added",
+    message: thread ? "Reply added" : "Comment added",
     comment: { ...comment.toObject(), replies: [] },
   });
 };

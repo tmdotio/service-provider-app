@@ -106,7 +106,7 @@ export default function Providers() {
         // key=query: every new search replays the rise-in animation
         <div key={query} className={`grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${loading ? "opacity-50" : ""}`}>
           {data?.providers.map((p, i) => (
-            <div key={p._id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}>
+            <div key={p._id} className="h-full animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}>
               <ProviderCard provider={p} />
             </div>
           ))}

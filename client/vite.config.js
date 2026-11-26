@@ -13,6 +13,12 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET || "http://localhost:5001",
         changeOrigin: true,
       },
+      // Live chat (WebSocket) goes to the same Express server
+      "/socket.io": {
+        target: process.env.VITE_PROXY_TARGET || "http://localhost:5001",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });

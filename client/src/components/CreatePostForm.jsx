@@ -2,12 +2,12 @@ import { ImagePlus, Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api, { getErrorMessage } from "../api/axios";
-import { checkImageFile, MAX_IMAGE_MB } from "../utils/format";
+import { checkImageFile, MAX_POST_IMAGE_MB } from "../utils/format";
 
-const MAX_PER_SIDE = 2;
+const MAX_PHOTOS = 4;
 
-/** One upload box: "Before" or "After", up to 2 photos. */
-function PhotoSide({ title, hint, files, setFiles, required }) {
+/** Optional work and promotional photos. */
+function Photos({ title, hint, files, setFiles, disabled }) {
   const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files]);
   useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
 
@@ -16,29 +16,30 @@ function PhotoSide({ title, hint, files, setFiles, required }) {
     e.target.value = "";
     const valid = [];
     for (const file of picked) {
-      const problem = checkImageFile(file);
+      const problem = checkImageFile(file, MAX_POST_IMAGE_MB);
       if (problem) toast.error(problem);
       else valid.push(file);
     }
     const next = [...files, ...valid];
-    if (next.length > MAX_PER_SIDE) toast.error(`Up to ${MAX_PER_SIDE} photos for "${title}"`);
-    setFiles(next.slice(0, MAX_PER_SIDE));
+    if (next.length > MAX_PHOTOS) toast.error(`Up to ${MAX_PHOTOS} photos for "${title}"`);
+    setFiles(next.slice(0, MAX_PHOTOS));
   };
 
   return (
     <div className="rounded-[22px] border border-dashed border-line p-3">
       <div className="mb-2 flex items-center justify-between px-1">
         <span className="text-xs font-bold uppercase tracking-wider">
-          {title} {required && <span className="text-accent">*</span>}
+          {title}
         </span>
         <span className="text-xs text-muted">{hint}</span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {previews.map((p, i) => (
           <div key={p.url} className="relative aspect-square">
             <img src={p.url} alt="" className="h-full w-full rounded-2xl object-cover" />
             <button
               type="button"
+              disabled={disabled}
               onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
               className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white"
               aria-label={`Remove ${title} photo`}
@@ -47,11 +48,11 @@ function PhotoSide({ title, hint, files, setFiles, required }) {
             </button>
           </div>
         ))}
-        {files.length < MAX_PER_SIDE && (
+        {files.length < MAX_PHOTOS && (
           <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 text-muted transition hover:text-accent">
             <ImagePlus className="h-6 w-6" />
             <span className="text-xs font-medium">Add photo</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={add} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={disabled} aria-label="Add photos" className="hidden" onChange={add} />
           </label>
         )}
       </div>
@@ -60,32 +61,29 @@ function PhotoSide({ title, hint, files, setFiles, required }) {
 }
 
 /**
- * Provider posts their own work: before/after photos + a short story.
+ * Provider shares work, service updates and promotions with optional photos.
  * Only providers see this form; customers take part through comments.
  */
 export default function CreatePostForm({ placeholder, onCreated }) {
   const [text, setText] = useState("");
-  const [before, setBefore] = useState([]);
-  const [after, setAfter] = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
-    if (after.length === 0) return toast.error("Add at least one photo of the finished work");
+    if (saving) return;
     if (text.trim().length < 3) return toast.error("Please write a few words about the job");
 
     const form = new FormData();
     form.append("text", text.trim());
-    before.forEach((f) => form.append("before", f));
-    after.forEach((f) => form.append("after", f));
+    photos.forEach((file) => form.append("images", file));
 
     setSaving(true);
     try {
       const res = await api.post("/posts", form);
       toast.success("Your work is posted!");
       setText("");
-      setBefore([]);
-      setAfter([]);
+      setPhotos([]);
       onCreated?.(res.data.post);
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -98,21 +96,21 @@ export default function CreatePostForm({ placeholder, onCreated }) {
     <form onSubmit={submit} className="card space-y-4 p-4 sm:p-5">
       <div>
         <p className="font-semibold">Post your work</p>
-        <p className="text-sm text-muted">Before/after photos win customers' trust. Customers can comment and you can reply.</p>
+        <p className="text-sm text-muted">Share your work, services, offers or promotions. Photos are optional—no before/after needed.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <PhotoSide title="Before" hint="optional" files={before} setFiles={setBefore} />
-        <PhotoSide title="After" hint={`max ${MAX_IMAGE_MB} MB each`} files={after} setFiles={setAfter} required />
-      </div>
+      <Photos title="Photos (optional)" hint={`Up to 4 · ${MAX_POST_IMAGE_MB} MB each`} files={photos} setFiles={setPhotos} disabled={saving} />
 
       <textarea
         className="input min-h-24 resize-y"
-        placeholder={placeholder}
+        placeholder={placeholder || "Share recent work, your services or a special offer..."}
         value={text}
         maxLength={2000}
         onChange={(e) => setText(e.target.value)}
-        aria-label="About this job"
+        aria-label="Post text"
+        required
+        minLength={3}
+        disabled={saving}
       />
 
       <button className="btn-primary h-12 w-full sm:w-auto sm:px-8" disabled={saving}>

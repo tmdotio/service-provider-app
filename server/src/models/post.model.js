@@ -5,14 +5,13 @@ const imageSchema = new mongoose.Schema(
     url: { type: String, required: true },
     fileId: { type: String, required: true },
     // "before" = condition before the job, "after" = finished work
-    label: { type: String, enum: ["before", "after"], default: "after" },
+    label: { type: String, enum: ["before", "after", "photo"], default: "photo" },
   },
   { _id: false },
 );
 
 /**
- * A provider's post about their own work, with before/after photos.
- * Only providers post; customers can comment and the provider replies.
+ * A provider's work update or promotion, with optional photos.
  */
 const postSchema = new mongoose.Schema(
   {
@@ -39,8 +38,8 @@ const postSchema = new mongoose.Schema(
     images: {
       type: [imageSchema],
       validate: {
-        validator: (images) => images.length >= 1 && images.length <= 4,
-        message: "A post must have 1 to 4 images",
+        validator: (images) => images.length <= 4,
+        message: "A post can have up to 4 images",
       },
     },
 

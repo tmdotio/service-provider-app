@@ -14,10 +14,17 @@ const commentSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Set when this is the provider's reply to a comment (one level deep)
+    // Set on replies: the top-level comment of the thread (threads stay one level deep)
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Comment",
+      default: null,
+    },
+
+    // In a thread, the person this reply answers (shown as "@name")
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
 

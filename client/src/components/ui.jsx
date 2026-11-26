@@ -1,5 +1,6 @@
-import { ArrowUpRight, Loader2, Star, X } from "lucide-react";
+import { ArrowUpRight, Loader2, Star, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { startScroll, stopScroll } from "../utils/smoothScroll";
 import { Link } from "react-router";
 import { ikUrl, initials } from "../utils/format";
@@ -278,6 +279,19 @@ export function StatusBadge({ status }) {
   );
 }
 
+/** Which service a review / job was for: "🔧 Electrician service". */
+export function ServiceTag({ name, className = "" }) {
+  if (!name) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent ${className}`}
+    >
+      <Wrench className="h-3 w-3" />
+      {name} service
+    </span>
+  );
+}
+
 /** Small grey tag: "Linkedin", "Email" */
 export function Tag({ children }) {
   return <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-muted">{children}</span>;
@@ -299,7 +313,8 @@ export function Modal({ open, onClose, title, children, wide = false }) {
 
   if (!open) return null;
 
-  return (
+  // Escape card masks and stacking contexts so the overlay covers the viewport.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-3"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
@@ -321,7 +336,8 @@ export function Modal({ open, onClose, title, children, wide = false }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

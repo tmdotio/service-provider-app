@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import api, { getErrorMessage } from "../api/axios";
-import { Modal, Stars } from "./ui";
+import { Modal, ServiceTag, Stars } from "./ui";
 
 /** Modal asking for a reason (cancel / reject / no-show). */
 export function ReasonModal({ open, title, label, confirmText, required = true, onClose, onConfirm }) {
@@ -64,6 +64,11 @@ export function ReviewModal({ booking, open, onClose, onDone }) {
   return (
     <Modal open={open} onClose={onClose} title={`Review ${booking.provider?.businessName}`}>
       <form onSubmit={submit} className="space-y-4">
+        {booking.category?.name && (
+          <p className="text-sm text-muted">
+            Your review will be shown on their page as an <ServiceTag name={booking.category.name} /> review.
+          </p>
+        )}
         <div>
           <p className="label">Your rating</p>
           <Stars value={rating} onChange={setRating} size="h-8 w-8" />
@@ -74,7 +79,7 @@ export function ReviewModal({ booking, open, onClose, onDone }) {
             id="comment"
             className="input min-h-24"
             maxLength={1000}
-            placeholder="Was the work good? Did they come on time?"
+            placeholder={`How was the ${booking.category?.name?.toLowerCase() || ""} work? Did they come on time?`.replace("  ", " ")}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />

@@ -1,5 +1,6 @@
 import { CheckCircle2, Flag, FolderOpen, Trash2, UserCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import toast from "react-hot-toast";
 import api, { getErrorMessage } from "../../api/axios";
 import { ReasonModal } from "../../components/BookingActions";
@@ -212,7 +213,9 @@ function Categories() {
             <div key={c._id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="font-medium">{c.name}</p>
-                <p className="text-xs text-muted">{c.providersCount} providers</p>
+                <p className="text-xs text-muted">
+                  {c.providersCount} provider{c.providersCount === 1 ? "" : "s"}
+                </p>
               </div>
               <button
                 className="p-2 text-muted hover:text-rose-500"
@@ -229,56 +232,117 @@ function Categories() {
   );
 }
 
-function Users() {
-  const { data, loading, error, refetch } = useFetch(() => api.get("/admin/users"), []);
-  const [q, setQ] = useState("");
-  if (loading) return <Spinner />;
-  if (error) return <ErrorBox message={error} />;
+/** Wait until typing stops before searching. */
+function useDebounced(value, ms = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return debounced;
+}
 
-  const users = data.users.filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(q.toLowerCase()));
+function Users() {
+  const [q, setQ] = useState("");
+  const [role, setRole] = useState("");
+  const [page, setPage] = useState(1);
+  const search = useDebounced(q.trim());
+  const { data, loading, error, refetch } = useFetch(
+    () => api.get("/admin/users", { params: { q: search || undefined, role: role || undefined, page } }),
+    [search, role, page],
+  );
+
+  const toggle = (u) => {
+    const verb = u.isActive ? "Deactivate" : "Activate";
+    const warning = u.isActive
+      ? `${verb} ${u.name}?\n\nThey will be logged out everywhere, cannot log in, and are hidden from search until you activate them again.`
+      : `${verb} ${u.name}? They will be able to log in again.`;
+    if (!window.confirm(warning)) return;
+    action(
+      () => api.patch(`/admin/users/${u._id}/status`, { isActive: !u.isActive }),
+      u.isActive ? "User deactivated" : "User activated",
+      refetch,
+    );
+  };
 
   return (
     <div className="space-y-4">
-      <input className="input" placeholder="Search by name or email" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-muted">
-            <tr>
-              <th className="px-4 py-3 font-medium">User</th>
-              <th className="px-4 py-3 font-medium">Role</th>
-              <th className="px-4 py-3 font-medium">Joined</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u._id} className="border-t">
-                <td className="px-4 py-3">
-                  <p className="font-medium">{u.name}</p>
-                  <p className="text-xs text-muted">{u.email}</p>
-                </td>
-                <td className="px-4 py-3 capitalize">{u.role}</td>
-                <td className="px-4 py-3 text-muted">{timeAgo(u.createdAt)}</td>
-                <td className="px-4 py-3">
-                  <button
-                    className={`btn px-3 py-1 text-xs ${u.isActive ? "bg-lime-400/20 text-lime-700 dark:text-lime-300" : "bg-rose-500/15 text-rose-600 dark:text-rose-300"}`}
-                    onClick={() =>
-                      action(
-                        () => api.patch(`/admin/users/${u._id}/status`, { isActive: !u.isActive }),
-                        u.isActive ? "User deactivated" : "User activated",
-                        refetch,
-                      )
-                    }
-                    title="Click to change"
-                  >
-                    {u.isActive ? "Active" : "Inactive"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-wrap gap-2">
+        <input
+          className="input min-w-0 flex-1"
+          placeholder="Search by name or email"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Search users"
+        />
+        <select
+          className="input w-auto"
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Filter by role"
+        >
+          <option value="">All roles</option>
+          <option value="customer">Customers</option>
+          <option value="provider">Providers</option>
+        </select>
       </div>
+      <ErrorBox message={error} />
+      {loading && !data ? (
+        <Spinner />
+      ) : (
+        <div className={`card overflow-x-auto transition-opacity ${loading ? "opacity-60" : ""}`}>
+          <table className="w-full text-sm">
+            <thead className="text-left text-muted">
+              <tr>
+                <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium">Joined</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium"><span className="sr-only">Action</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data?.users.map((u) => (
+                <tr key={u._id} className="border-t">
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{u.name}</p>
+                    <p className="text-xs text-muted">{u.email}</p>
+                  </td>
+                  <td className="px-4 py-3 capitalize">{u.role}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-muted">{timeAgo(u.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        u.isActive ? "bg-lime-400/20 text-lime-700 dark:text-lime-300" : "bg-rose-500/15 text-rose-600 dark:text-rose-300"
+                      }`}
+                    >
+                      {u.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className={u.isActive ? "btn-outline h-9 px-3 text-xs hover:border-rose-500 hover:text-rose-500" : "btn-primary h-9 px-3 text-xs"}
+                      onClick={() => toggle(u)}
+                    >
+                      {u.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {data?.users.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted">No users found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pagination pagination={data?.pagination} onPage={setPage} />
     </div>
   );
 }
@@ -296,7 +360,7 @@ function Bookings() {
       <select className="input max-w-52" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
         <option value="">All statuses</option>
         {["pending", "in_progress", "completed", "cancelled", "rejected", "no_show"].map((s) => (
-          <option key={s} value={s}>{s.replace("_", " ")}</option>
+          <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1).replace("_", " ")}</option>
         ))}
       </select>
       <ErrorBox message={error} />
@@ -346,7 +410,10 @@ const TABS = [
 ];
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState("overview");
+  // The tab lives in the URL (/admin?tab=users), so refresh and links keep it
+  const [params, setParams] = useSearchParams();
+  const tab = TABS.some(([key]) => key === params.get("tab")) ? params.get("tab") : "overview";
+  const setTab = (next) => setParams(next === "overview" ? {} : { tab: next }, { replace: true });
   const Current = TABS.find(([key]) => key === tab)[2];
 
   return (

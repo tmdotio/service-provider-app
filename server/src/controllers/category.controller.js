@@ -3,22 +3,25 @@ import ServiceProvider from "../models/serviceProvider.model.js";
 import Category from "../models/category.model.js";
 import {
   CACHE_KEYS,
+  cacheProviders,
   clearCache,
-  getOrSetCache,
   setCacheHeader,
 } from "../services/cache.service.js";
 
 /**
  * List all categories with the number of approved providers in each.
- * Cached in Redis for 1 hour; the cache is cleared whenever an admin
- * creates, updates or deletes a category.
+ * Cached in Redis for 1 hour, and refreshed after any category or
+ * provider change.
  *
  * @route   GET /api/categories
  * @access  Public
  */
 export const getAllCategories = async (req, res) => {
   const cache = {};
-  const categories = await getOrSetCache(CACHE_KEYS.categories, 3600, () =>
+  // Versioned with the provider cache: the provider counts change when a
+  // provider is approved, deactivated or changes services, not only when
+  // a category is edited, so any provider change refreshes this too.
+  const categories = await cacheProviders(CACHE_KEYS.categories, 3600, () =>
     Category.aggregate([
       { $sort: { name: 1 } },
       {
@@ -32,6 +35,9 @@ export const getAllCategories = async (req, res) => {
                 verificationStatus: "approved",
               },
             },
+            // Same rule as search: providers of deactivated accounts don't count
+            { $lookup: { from: "users", localField: "user", foreignField: "_id", as: "account" } },
+            { $match: { "account.isActive": { $ne: false } } },
             { $count: "count" },
           ],
           as: "providerStats",

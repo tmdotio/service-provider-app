@@ -39,6 +39,9 @@ const notificationSchema = new mongoose.Schema(
     data: {
       booking: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
       post: { type: mongoose.Schema.Types.ObjectId, ref: "Post" },
+      comment: { type: mongoose.Schema.Types.ObjectId, ref: "Comment" },
+      // Which side of a booking this is for (a provider can also book as a customer)
+      side: { type: String, enum: ["customer", "provider"] },
     },
 
     isRead: {

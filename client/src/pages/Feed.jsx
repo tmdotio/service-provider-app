@@ -3,10 +3,13 @@ import { useState } from "react";
 import { Link } from "react-router";
 import api from "../api/axios";
 import PostCard from "../components/PostCard";
+import CreatePostForm from "../components/CreatePostForm";
+import useAuth from "../hooks/useAuth";
 import { EmptyState, ErrorBox, PageHeader, PostSkeleton, SkeletonGrid } from "../components/ui";
 import useFetch, { readCache, writeCache } from "../hooks/useFetch";
 
 export default function Feed() {
+  const { isProvider } = useAuth();
   const [page, setPage] = useState(1);
   // The list stays in memory between visits, so coming back is instant
   // (cleared on login/logout because it includes "liked by me")
@@ -36,15 +39,21 @@ export default function Feed() {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <PageHeader
         title="Work board"
-        subtitle="Before/after photos of real jobs, posted by the providers themselves."
+        subtitle="Work, services and offers shared by our providers."
       />
 
       <p className="mb-6 rounded-[20px] border border-accent/30 bg-accent/10 px-5 py-3.5 text-sm">
-        Real jobs posted by our providers, with before/after photos. Have a question? Ask in the comments — the provider can reply.{" "}
+        Explore providers' work, updates and promotions. Like a post or join the conversation in the comments.{" "}
         <Link to="/providers" className="font-semibold text-accent underline underline-offset-2">Find a provider</Link>
       </p>
 
       <ErrorBox message={error} />
+
+      {isProvider && (
+        <div className="mb-6">
+          <CreatePostForm onCreated={(post) => setPosts((list) => [post, ...list.filter((p) => p._id !== post._id)])} />
+        </div>
+      )}
 
       <div className="space-y-4">
         {posts.map((p, i) => (

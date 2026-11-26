@@ -21,6 +21,8 @@ export const setAccessToken = (token) => {
   accessToken = token;
 };
 
+export const getAccessToken = () => accessToken;
+
 export const setLogoutHandler = (handler) => {
   onLogout = handler;
 };

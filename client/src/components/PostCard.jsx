@@ -1,30 +1,49 @@
-import { CornerDownRight, Flag, Heart, MessageCircle, Send, Star, Trash2 } from "lucide-react";
+import { CornerDownRight, Flag, Heart, MessageCircle, Send, ShieldCheck, Star, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router";
 import api, { getErrorMessage } from "../api/axios";
 import useAuth from "../hooks/useAuth";
 import { timeAgo } from "../utils/format";
+import { scrollToElement } from "../utils/smoothScroll";
 import { Avatar, Img, Modal } from "./ui";
 
 const REPORT_REASONS = ["spam", "fake", "abusive", "inappropriate", "other"];
 
 /** One comment bubble (used for comments and replies). */
-function Bubble({ c, isReply, canDelete, onDelete, isProviderReply }) {
+function Bubble({ c, isReply, canDelete, onDelete, onReply, highlighted }) {
+  const isAdmin = c.author?.role === "admin";
+  const isProvider = c.author?.role === "provider";
   return (
-    <div className="flex gap-2.5">
+    <div
+      id={`comment-${c._id}`}
+      className={`flex scroll-mt-28 gap-2.5 rounded-[20px] transition-shadow duration-700 ${highlighted ? "ring-2 ring-accent ring-offset-4 ring-offset-surface" : ""}`}
+    >
       <Avatar user={c.author} size={isReply ? "h-7 w-7" : "h-8 w-8"} />
-      <div className={`min-w-0 flex-1 rounded-[18px] px-3.5 py-2.5 ${isProviderReply ? "border border-accent/30 bg-accent/10" : "bg-surface-2"}`}>
+      <div className={`min-w-0 flex-1 rounded-[18px] px-3.5 py-2.5 ${isAdmin ? "border border-amber-400/60 bg-amber-100/80 dark:bg-amber-950/50" : "bg-surface-2"}`}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
-            <span className="truncate">{c.author?.name}</span>
-            {isProviderReply && (
-              <span className="shrink-0 rounded-full bg-accent px-1.5 text-[10px] font-bold uppercase text-accent-ink">Provider</span>
+            <span className="truncate">{c.author?.name || "Deleted user"}</span>
+            {isAdmin && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400 bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-950">
+                <ShieldCheck className="h-3 w-3" /> Admin
+              </span>
+            )}
+            {isProvider && (
+              <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">Provider</span>
             )}
           </span>
           <span className="shrink-0 text-xs text-muted">{timeAgo(c.createdAt)}</span>
         </div>
-        <p className="mt-0.5 whitespace-pre-line break-words text-sm text-fg/90">{c.text}</p>
+        <p className="mt-0.5 whitespace-pre-line break-words text-sm text-fg/90">
+          {c.replyTo?.name && <span className="mr-1 font-semibold text-accent">@{c.replyTo.name}</span>}
+          {c.text}
+        </p>
+        {onReply && (
+          <button onClick={onReply} className="mt-1 flex items-center gap-1 text-xs font-semibold text-muted hover:text-accent">
+            <CornerDownRight className="h-3.5 w-3.5" /> Reply
+          </button>
+        )}
       </div>
       {canDelete && (
         <button onClick={onDelete} className="self-start p-1.5 text-muted hover:text-rose-500" aria-label="Delete comment">
@@ -36,24 +55,35 @@ function Bubble({ c, isReply, canDelete, onDelete, isProviderReply }) {
 }
 
 /**
- * Comments under a post. Anyone logged in can comment; only the
- * provider who posted can reply (one level, shown under the comment).
+ * Comments under a post. Anyone logged in can comment and reply.
+ * Replies stay in one thread under the top-level comment; a reply to a
+ * reply shows "@name" so it is clear who is being answered.
  */
-function Comments({ post, onCountChange }) {
+function Comments({ post, onCountChange, highlightId }) {
   const { user, isAdmin } = useAuth();
   const [comments, setComments] = useState(null);
   const [text, setText] = useState("");
+  // { thread: top-level comment id, target: comment being answered, name }
   const [replyTo, setReplyTo] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [flash, setFlash] = useState(highlightId);
 
   const isPostOwner = Boolean(user && post.author?._id === user._id);
 
   useEffect(() => {
     api
-      .get(`/posts/${post._id}/comments`)
+      .get(`/posts/${post._id}/comments`, { params: { limit: 50 } })
       .then((res) => setComments(res.data.comments))
       .catch(() => setComments([]));
   }, [post._id]);
+
+  // Coming from a notification: scroll to that comment and flash it
+  useEffect(() => {
+    if (!comments || !highlightId) return;
+    scrollToElement(document.getElementById(`comment-${highlightId}`));
+    const id = setTimeout(() => setFlash(null), 2500);
+    return () => clearTimeout(id);
+  }, [comments, highlightId]);
 
   const add = async (e) => {
     e.preventDefault();
@@ -68,13 +98,19 @@ function Comments({ post, onCountChange }) {
     }
   };
 
+  const startReply = (thread, target) => {
+    if (!user) return toast("Please log in to reply");
+    setReplyTo({ thread: thread._id, target: target._id, name: target.author?.name || "Deleted user" });
+    setReplyText("");
+  };
+
   const reply = async (e) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || !replyTo) return;
     try {
-      const res = await api.post(`/posts/${post._id}/comments`, { text: replyText.trim(), parentId: replyTo });
+      const res = await api.post(`/posts/${post._id}/comments`, { text: replyText.trim(), parentId: replyTo.target });
       setComments((list) =>
-        list.map((c) => (c._id === replyTo ? { ...c, replies: [...c.replies, res.data.comment] } : c)),
+        list.map((c) => (c._id === replyTo.thread ? { ...c, replies: [...c.replies, res.data.comment] } : c)),
       );
       setReplyTo(null);
       setReplyText("");
@@ -105,11 +141,11 @@ function Comments({ post, onCountChange }) {
 
   return (
     <div className="space-y-4 border-t border-line px-4 py-4">
-      {user && !isPostOwner && (
+      {user && (
         <form onSubmit={add} className="flex gap-2">
           <input
             className="input rounded-full"
-            placeholder="Ask about this job..."
+            placeholder="Write a comment..."
             value={text}
             maxLength={500}
             onChange={(e) => setText(e.target.value)}
@@ -122,7 +158,7 @@ function Comments({ post, onCountChange }) {
       )}
       {!user && (
         <p className="text-sm text-muted">
-          <Link to="/login" className="font-semibold text-accent hover:underline">Log in</Link> to ask a question.
+          <Link to="/login" className="font-semibold text-accent hover:underline">Log in</Link> to like or comment.
         </p>
       )}
 
@@ -131,39 +167,46 @@ function Comments({ post, onCountChange }) {
 
       {comments?.map((c) => (
         <div key={c._id} className="space-y-2">
-          <Bubble c={c} canDelete={canDelete(c)} onDelete={() => remove(c)} />
+          <Bubble
+            c={c}
+            highlighted={flash === c._id}
+            canDelete={canDelete(c)}
+            onDelete={() => remove(c)}
+            onReply={user ? () => startReply(c, c) : undefined}
+          />
 
-          {(c.replies.length > 0 || replyTo === c._id || isPostOwner) && (
+          {(c.replies.length > 0 || replyTo?.thread === c._id) && (
             <div className="ml-6 space-y-2 border-l-2 border-line pl-3">
               {c.replies.map((r) => (
-                <Bubble key={r._id} c={r} isReply isProviderReply canDelete={canDelete(r)} onDelete={() => remove(r, c._id)} />
+                <Bubble
+                  key={r._id}
+                  c={r}
+                  isReply
+                  highlighted={flash === r._id}
+                  canDelete={canDelete(r)}
+                  onDelete={() => remove(r, c._id)}
+                  onReply={user ? () => startReply(c, r) : undefined}
+                />
               ))}
 
-              {isPostOwner &&
-                (replyTo === c._id ? (
-                  <form onSubmit={reply} className="flex gap-2">
-                    <input
-                      className="input rounded-full"
-                      autoFocus
-                      placeholder={`Reply to ${c.author?.name}...`}
-                      value={replyText}
-                      maxLength={500}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      aria-label="Write a reply"
-                    />
-                    <button className="btn-primary h-12 shrink-0 sm:h-11">Reply</button>
-                  </form>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setReplyTo(c._id);
-                      setReplyText("");
-                    }}
-                    className="flex items-center gap-1.5 py-1 text-xs font-semibold text-accent"
-                  >
-                    <CornerDownRight className="h-3.5 w-3.5" /> Reply
+              {replyTo?.thread === c._id && (
+                <form onSubmit={reply} className="flex gap-2">
+                  <input
+                    className="input rounded-full"
+                    autoFocus
+                    placeholder={`Reply to ${replyTo.name}...`}
+                    value={replyText}
+                    maxLength={500}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Escape" && setReplyTo(null)}
+                    aria-label="Write a reply"
+                  />
+                  <button type="button" onClick={() => setReplyTo(null)} className="btn-outline h-12 shrink-0 sm:h-11">
+                    Cancel
                   </button>
-                ))}
+                  <button className="btn-primary h-12 shrink-0 sm:h-11">Reply</button>
+                </form>
+              )}
             </div>
           )}
         </div>
@@ -172,11 +215,11 @@ function Comments({ post, onCountChange }) {
   );
 }
 
-export default function PostCard({ post: initialPost, onDeleted }) {
+export default function PostCard({ post: initialPost, onDeleted, openComments = false, highlightCommentId }) {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [post, setPost] = useState(initialPost);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(openComments);
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState("spam");
 
@@ -225,8 +268,6 @@ export default function PostCard({ post: initialPost, onDeleted }) {
   };
 
   const images = post.images || [];
-  const beforeImgs = images.filter((img) => img.label === "before");
-  const afterImgs = images.filter((img) => img.label !== "before");
   const provider = post.provider;
 
   return (
@@ -259,49 +300,15 @@ export default function PostCard({ post: initialPost, onDeleted }) {
 
       <p className="whitespace-pre-line px-4 pb-4 text-sm text-fg">{post.text}</p>
 
-      {/* Photos: Before | After side by side when both exist */}
-      {images.length > 0 &&
-        (beforeImgs.length > 0 ? (
-          <div className="grid grid-cols-2 gap-0.5">
-            {[
-              ["Before", beforeImgs[0]],
-              ["After", afterImgs[0]],
-            ].map(([label, img]) =>
-              img ? (
-                <a key={label} href={img.url} target="_blank" rel="noreferrer" className="relative block">
-                  <Img src={img.url} alt={`${label} the job`} width={480} className="aspect-[4/5] w-full sm:aspect-square" />
-                  <span
-                    className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
-                      label === "After" ? "bg-accent text-accent-ink" : "bg-black/60 text-white backdrop-blur"
-                    }`}
-                  >
-                    {label}
-                  </span>
-                </a>
-              ) : null,
-            )}
-          </div>
-        ) : (
-          <div className={`grid gap-0.5 ${afterImgs.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-            {afterImgs.map((img, i) => (
-              <a key={img.url} href={img.url} target="_blank" rel="noreferrer">
-                <Img
-                  src={img.url}
-                  alt={`Photo ${i + 1}`}
-                  width={afterImgs.length === 1 ? 900 : 480}
-                  className={`w-full ${afterImgs.length === 1 ? "aspect-[4/3] max-h-[28rem]" : "aspect-square"}`}
-                />
-              </a>
-            ))}
-          </div>
-        ))}
-
-      {/* Extra photos beyond the first before/after pair */}
-      {beforeImgs.length > 0 && images.length > 2 && (
-        <div className="flex gap-1 overflow-x-auto px-4 pt-2">
-          {[...beforeImgs.slice(1), ...afterImgs.slice(1)].map((img) => (
-            <a key={img.url} href={img.url} target="_blank" rel="noreferrer" className="shrink-0">
-              <Img src={img.url} width={64} height={64} className="h-16 w-16 rounded-xl" />
+      {images.length > 0 && (
+        <div className={`grid gap-0.5 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+          {images.map((img, i) => (
+            <a key={img.fileId || img.url} href={img.url} target="_blank" rel="noreferrer" className="relative block">
+              <Img src={img.url} alt={`Work photo ${i + 1}`} width={images.length === 1 ? 900 : 480}
+                className={`w-full ${images.length === 1 ? "aspect-[4/3] max-h-[28rem]" : "aspect-square"}`} />
+              {["before", "after"].includes(img.label) && (
+                <span className="absolute left-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-xs font-bold capitalize text-white">{img.label}</span>
+              )}
             </a>
           ))}
         </div>
@@ -336,6 +343,7 @@ export default function PostCard({ post: initialPost, onDeleted }) {
       {showComments && (
         <Comments
           post={post}
+          highlightId={highlightCommentId}
           onCountChange={(n) => setPost((p) => ({ ...p, commentsCount: p.commentsCount + n }))}
         />
       )}

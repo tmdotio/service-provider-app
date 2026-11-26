@@ -23,7 +23,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     statusCode = 400;
     const multerMessages = {
-      LIMIT_FILE_SIZE: "Each image must be smaller than 1 MB",
+      LIMIT_FILE_SIZE: `Each image must be smaller than ${req.maxImageMB || 1} MB`,
       LIMIT_FILE_COUNT: "Too many images. Maximum is 4",
       LIMIT_UNEXPECTED_FILE: `Unexpected file field: ${err.field}`,
     };

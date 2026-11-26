@@ -39,3 +39,11 @@ export const scrollToTop = () => {
 
 export const stopScroll = () => lenis?.stop();
 export const startScroll = () => lenis?.start();
+
+/** Scroll an element to the middle of the screen (works with or without Lenis). */
+export const scrollToElement = (el) => {
+  if (!el) return;
+  const offset = -(window.innerHeight / 2 - el.getBoundingClientRect().height / 2);
+  if (lenis) lenis.scrollTo(el, { offset });
+  else el.scrollIntoView({ behavior: "smooth", block: "center" });
+};

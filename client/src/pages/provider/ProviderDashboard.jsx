@@ -1,10 +1,11 @@
 import { Bell, CalendarX, ImagePlus, Images, Loader2, LayoutGrid, MapPin, Pencil, Phone, Power, Star, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { Link, useSearchParams } from "react-router";
 import api, { getErrorMessage } from "../../api/axios";
 import { ReasonModal } from "../../components/BookingActions";
+import MessageButton from "../../components/MessageButton";
 import CreatePostForm from "../../components/CreatePostForm";
 import PostCard from "../../components/PostCard";
 import {
@@ -15,6 +16,7 @@ import {
   Modal,
   NotchCard,
   PageHeader,
+  ServiceTag,
   SectionPill,
   SkeletonGrid,
   Spinner,
@@ -24,6 +26,7 @@ import {
   TaskCardSkeleton,
 } from "../../components/ui";
 import useAuth from "../../hooks/useAuth";
+import { useSocketEvent } from "../../hooks/useChat";
 import useFetch from "../../hooks/useFetch";
 import { fetchMe } from "../../store/authSlice";
 import { checkImageFile, timeAgo } from "../../utils/format";
@@ -31,10 +34,11 @@ import { checkImageFile, timeAgo } from "../../utils/format";
 const TABS = {
   requests: ["pending"],
   active: ["in_progress"],
-  history: ["completed", "cancelled", "rejected", "no_show"],
+  // Cancelled bookings are not shown: you only get a notification
+  history: ["completed", "rejected", "no_show"],
 };
 
-function JobCard({ booking, onChanged }) {
+function JobCard({ booking, onChanged, onAccepted }) {
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -45,8 +49,11 @@ function JobCard({ booking, onChanged }) {
       toast.success(message);
       setModal(null);
       onChanged();
+      return true;
     } catch (err) {
       toast.error(getErrorMessage(err));
+      onChanged(); // the job may have changed meanwhile (e.g. the customer cancelled)
+      return false;
     } finally {
       setBusy(false);
     }
@@ -99,13 +106,20 @@ function JobCard({ booking, onChanged }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {customer && ["pending", "in_progress"].includes(booking.status) && (
+            <MessageButton bookingId={booking._id} className={active ? lineBtn : "btn-outline"} />
+          )}
           {booking.status === "pending" && (
             <>
               <button className="btn-outline" disabled={busy} onClick={() => setModal("reject")}>Reject</button>
               <button
                 className="btn-primary"
                 disabled={busy}
-                onClick={() => run(() => api.patch(`/booking/${booking._id}/respond`, { action: "accept" }), "Booking accepted. You are now busy.")}
+                onClick={() =>
+                  run(() => api.patch(`/booking/${booking._id}/respond`, { action: "accept" }), "Booking accepted. It is now in Active.").then(
+                    (ok) => ok && onAccepted?.(),
+                  )
+                }
               >
                 Accept
               </button>
@@ -117,7 +131,7 @@ function JobCard({ booking, onChanged }) {
               <button
                 className={darkBtn}
                 disabled={busy}
-                onClick={() => run(() => api.patch(`/booking/${booking._id}/complete`), "Job completed!")}
+                onClick={() => run(() => api.patch(`/booking/${booking._id}/complete`), "Job completed! You are available for new requests.")}
               >
                 Mark done
               </button>
@@ -176,6 +190,16 @@ function ReviewsWithReply({ providerId }) {
 
   return (
     <div className="space-y-4">
+      {data.services?.length > 0 && (
+        <div className="card flex flex-wrap gap-x-6 gap-y-2 p-4 text-sm">
+          <span className="font-semibold">Rating per service</span>
+          {data.services.map((s) => (
+            <span key={s._id} className="text-muted">
+              <span className="font-semibold text-fg">{s.name}</span> ★ {s.averageRating.toFixed(1)} · {s.count} review{s.count === 1 ? "" : "s"}
+            </span>
+          ))}
+        </div>
+      )}
       {data.reviews.map((r) => (
         <div key={r._id} className="card p-4">
           <div className="flex items-center gap-3">
@@ -186,6 +210,7 @@ function ReviewsWithReply({ providerId }) {
             </div>
             <Stars value={r.rating} />
           </div>
+          <ServiceTag name={r.category?.name} className="mt-3" />
           {r.comment && <p className="mt-2 text-sm text-fg/80">{r.comment}</p>}
           {r.providerReply?.text ? (
             <p className="mt-2 rounded-2xl bg-surface-2 p-3 text-sm text-fg/80">
@@ -361,23 +386,50 @@ function EditProfileModal({ profile, open, onClose, onSaved, onBannerChanged }) 
 export default function ProviderDashboard() {
   const { providerProfile: profile } = useAuth();
   const dispatch = useDispatch();
-  const [tab, setTab] = useState("requests");
-  // Links like /provider?section=posts or /provider?edit=1 open the right place
-  const [params] = useSearchParams();
-  const [section, setSection] = useState(() =>
-    ["jobs", "posts", "reviews"].includes(params.get("section")) ? params.get("section") : "jobs",
-  );
+  // Section and tab live in the URL (/provider?section=jobs&tab=active),
+  // so notifications open the right place, even when already on this page
+  const [params, setParams] = useSearchParams();
   const [editOpen, setEditOpen] = useState(() => params.get("edit") === "1");
   const [toggling, setToggling] = useState(false);
 
   const bookings = useFetch(() => api.get("/booking/provider"), [], "provider-jobs");
+  const all = bookings.data?.bookings || [];
+  const activeJob = all.find((b) => b.status === "in_progress");
 
-  if (!profile) return <Spinner className="py-20" />;
+  const section = ["jobs", "posts", "reviews"].includes(params.get("section")) ? params.get("section") : "jobs";
+  // No tab chosen: show the job in progress first, otherwise new requests
+  const tab = TABS[params.get("tab")] ? params.get("tab") : activeJob ? "active" : "requests";
+  const go = (next) =>
+    setParams(
+      (p) => {
+        const q = new URLSearchParams(p);
+        Object.entries(next).forEach(([k, v]) => q.set(k, v));
+        q.delete("edit");
+        return q;
+      },
+      { replace: true },
+    );
+  const setTab = (t) => go({ section: "jobs", tab: t });
+  const setSection = (s) => go({ section: s });
 
-  const reload = () => {
+  const reload = useCallback(() => {
     bookings.refetch();
     dispatch(fetchMe()); // availability / counters may have changed
-  };
+  }, [bookings.refetch, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live: a new request, or the customer cancelled / reported a no-show
+  useSocketEvent(
+    "booking:updated",
+    useCallback(({ side }) => side === "provider" && reload(), [reload]),
+  );
+
+  // The server can repair a stuck "busy"; then refresh my status too
+  const serverStatus = bookings.data?.availabilityStatus;
+  useEffect(() => {
+    if (serverStatus && profile && serverStatus !== profile.availabilityStatus) dispatch(fetchMe());
+  }, [serverStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!profile) return <Spinner className="py-20" />;
 
   const setAvailability = async (availabilityStatus) => {
     setToggling(true);
@@ -392,7 +444,6 @@ export default function ProviderDashboard() {
     }
   };
 
-  const all = bookings.data?.bookings || [];
   const list = all.filter((b) => TABS[tab].includes(b.status));
   const status = profile.availabilityStatus;
 
@@ -422,16 +473,22 @@ export default function ProviderDashboard() {
 
       {/* Status bar */}
       <div className="glass mb-8 flex flex-wrap items-center justify-between gap-3 rounded-full p-2 pl-5">
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span className="text-muted">Your status</span>
           <StatusBadge status={status} />
-          {status === "busy" && <span className="hidden text-muted sm:inline">On a job — finish it to get new requests</span>}
+          {activeJob ? (
+            <button onClick={() => setTab("active")} className="truncate text-left font-semibold text-accent hover:underline">
+              On a job: {activeJob.category?.name} for {activeJob.customer?.name || "a customer"} — open it to mark done
+            </button>
+          ) : status === "busy" ? (
+            <span className="text-muted">No job in progress — go online to get new requests</span>
+          ) : null}
         </div>
         <div className="flex gap-2">
           <button className="btn-ghost" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" /> Edit profile
           </button>
-          {status !== "busy" && (
+          {!activeJob && (
             <button
               className={status === "available" ? "btn-outline" : "btn-primary"}
               disabled={toggling}
@@ -496,7 +553,9 @@ export default function ProviderDashboard() {
                 />
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {list.map((b) => <JobCard key={b._id} booking={b} onChanged={reload} />)}
+                  {list.map((b) => (
+                    <JobCard key={b._id} booking={b} onChanged={reload} onAccepted={() => setTab("active")} />
+                  ))}
                 </div>
               )}
             </>

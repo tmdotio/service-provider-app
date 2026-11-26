@@ -1,9 +1,10 @@
 import { CalendarX, MapPin, Phone, Wrench } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import api, { getErrorMessage } from "../api/axios";
 import { ReasonModal, ReviewModal } from "../components/BookingActions";
+import MessageButton from "../components/MessageButton";
 import {
   Avatar,
   Chips,
@@ -17,6 +18,7 @@ import {
   StatusBadge,
   TaskCardSkeleton,
 } from "../components/ui";
+import { useSocketEvent } from "../hooks/useChat";
 import useFetch from "../hooks/useFetch";
 import { formatDate, timeAgo } from "../utils/format";
 
@@ -24,7 +26,8 @@ const NO_SHOW_AFTER_MS = 60 * 60 * 1000; // same rule as the server
 
 const TABS = {
   active: ["pending", "in_progress"],
-  past: ["completed", "cancelled", "rejected", "no_show"],
+  // Cancelled bookings are not shown: you only get a notification
+  past: ["completed", "rejected", "no_show"],
 };
 
 /** Re-render every 30s so the no-show button unlocks on time. */
@@ -110,6 +113,9 @@ function BookingCard({ booking, onChanged }) {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {provider && ["pending", "in_progress"].includes(booking.status) && (
+            <MessageButton bookingId={booking._id} className={outline} />
+          )}
           {["pending", "in_progress"].includes(booking.status) && (
             <button className={outline} onClick={() => setModal("cancel")}>Cancel</button>
           )}
@@ -171,8 +177,17 @@ function BookingCard({ booking, onChanged }) {
 }
 
 export default function MyBookings() {
-  const [tab, setTab] = useState("active");
+  // The tab lives in the URL, so a notification can open the right one
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "past" ? "past" : "active";
+  const setTab = (next) => setParams({ tab: next }, { replace: true });
   const { data, loading, error, refetch } = useFetch(() => api.get("/booking/customer"), [], "my-bookings");
+
+  // Live: the provider accepted / finished / cancelled -> refresh
+  useSocketEvent(
+    "booking:updated",
+    useCallback(({ side }) => side === "customer" && refetch(), [refetch]),
+  );
 
   const all = data?.bookings || [];
   const count = (key) => all.filter((b) => TABS[key].includes(b.status)).length;

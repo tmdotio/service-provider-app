@@ -108,7 +108,7 @@ for (const [provider, user, rating, comment] of reviews) {
     completedAt: new Date(Date.now() - 48 * hour),
     isReviewed: true,
   });
-  await Review.create({ booking: booking._id, customer: user._id, provider: provider._id, rating, comment });
+  await Review.create({ booking: booking._id, customer: user._id, provider: provider._id, category: booking.category, rating, comment });
   await ServiceProvider.updateOne({ _id: provider._id }, { $inc: { completedJobs: 1 } });
 }
 for (const p of providers) await Review.recalculateProviderRating(p._id);

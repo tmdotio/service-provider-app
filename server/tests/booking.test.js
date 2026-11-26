@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import Booking from "../src/models/booking.model.js";
+import Review from "../src/models/review.model.js";
 import ServiceProvider from "../src/models/serviceProvider.model.js";
 import {
   api,
@@ -8,6 +9,7 @@ import {
   createApprovedProvider,
   createCategory,
   createCustomer,
+  completeJob,
 } from "./helpers.js";
 
 let admin;
@@ -148,6 +150,59 @@ describe("Booking flow", () => {
     expect(res.status).toBe(200);
     expect(res.body.booking.cancelledBy).toBe("provider");
     expect(await providerStatus(provider.providerId)).toBe("available");
+  });
+
+  it("customer cancels an in-progress job: provider is free and can take a new booking", async () => {
+    const provider = await createApprovedProvider({ admin, category });
+    const customer = await createCustomer();
+    const { body } = await book(customer, provider.providerId);
+    await respond(provider, body.booking._id, "accept");
+    expect(await providerStatus(provider.providerId)).toBe("busy");
+
+    const res = await api()
+      .patch(`/api/booking/${body.booking._id}/cancel`)
+      .set(auth(customer.token))
+      .send({ reason: "Fixed it myself" });
+    expect(res.status).toBe(200);
+    expect(res.body.booking.cancelledBy).toBe("customer");
+    expect(await providerStatus(provider.providerId)).toBe("available");
+
+    // The provider is told, and the note says they are available again
+    const notes = await api().get("/api/notifications").set(auth(provider.token));
+    const cancelled = notes.body.notifications.find((n) => n.type === "booking_cancelled");
+    expect(cancelled.message).toBe(`Your booking with ${customer.user.name} has been cancelled`);
+    expect(cancelled.data.side).toBe("provider");
+
+    // A cancelled booking is only a notification: it is not listed for either side
+    const providerList = await api().get("/api/booking/provider").set(auth(provider.token));
+    expect(providerList.body.bookings.map((b) => b._id)).not.toContain(body.booking._id);
+    const customerList = await api().get("/api/booking/customer").set(auth(customer.token));
+    expect(customerList.body.bookings.map((b) => b._id)).not.toContain(body.booking._id);
+
+    // ...and someone else can book and be accepted right away
+    const other = await createCustomer();
+    const next = await book(other, provider.providerId);
+    expect(next.status).toBe(201);
+    expect((await respond(provider, next.body.booking._id, "accept")).status).toBe(200);
+  });
+
+  it("a provider stuck on busy with no job in progress is repaired when they open their jobs", async () => {
+    const provider = await createApprovedProvider({ admin, category });
+    await ServiceProvider.updateOne({ _id: provider.providerId }, { availabilityStatus: "busy" });
+
+    const res = await api().get("/api/booking/provider").set(auth(provider.token));
+    expect(res.body.availabilityStatus).toBe("available");
+    expect(await providerStatus(provider.providerId)).toBe("available");
+  });
+
+  it("a real active job is never repaired away", async () => {
+    const provider = await createApprovedProvider({ admin, category });
+    const customer = await createCustomer();
+    const { body } = await book(customer, provider.providerId);
+    await respond(provider, body.booking._id, "accept");
+
+    const res = await api().get("/api/booking/provider").set(auth(provider.token));
+    expect(res.body.availabilityStatus).toBe("busy");
   });
 
   it("no-show: not allowed before 1 hour, allowed after", async () => {
@@ -308,5 +363,52 @@ describe("Robustness", () => {
       .patch(`/api/booking/${body.booking._id}/respond`)
       .set(auth(provider.token));
     expect(reject.status).toBe(400); // missing action, not a 500
+  });
+
+  it("every review says which service it was for, with a per-service summary and filter", async () => {
+    const provider = await createApprovedProvider({ admin, category });
+    const customer = await createCustomer("Reviewer");
+    const bookingId = await completeJob({ customer, provider, category });
+
+    const created = await api()
+      .post(`/api/booking/${bookingId}/review`)
+      .set(auth(customer.token))
+      .send({ rating: 4, comment: "Wiring done neatly" });
+    expect(created.status).toBe(201);
+    expect(created.body.review.category.name).toBe("Electrician");
+
+    const notes = await api().get("/api/notifications").set(auth(provider.token));
+    expect(notes.body.notifications[0].message).toBe("Reviewer gave your Electrician service 4 stars");
+
+    const list = await api().get(`/api/provider/${provider.providerId}/reviews`);
+    expect(list.body.reviews[0].category.name).toBe("Electrician");
+    expect(list.body.services).toEqual([
+      { _id: String(category._id), name: "Electrician", count: 1, averageRating: 4 },
+    ]);
+    // Booking details (address etc.) are never part of a public review
+    expect(list.body.reviews[0].booking).toBe(bookingId);
+
+    const filtered = await api().get(`/api/provider/${provider.providerId}/reviews?service=${category._id}`);
+    expect(filtered.body.reviews).toHaveLength(1);
+    const otherService = await createCategory();
+    const none = await api().get(`/api/provider/${provider.providerId}/reviews?service=${otherService._id}`);
+    expect(none.body.reviews).toHaveLength(0);
+    expect((await api().get(`/api/provider/${provider.providerId}/reviews?service=nope`)).status).toBe(400);
+  });
+
+  it("older reviews without a service get it from their booking", async () => {
+    const provider = await createApprovedProvider({ admin, category });
+    const customer = await createCustomer();
+    const bookingId = await completeJob({ customer, provider, category });
+    const review = await Review.create({
+      booking: bookingId,
+      customer: customer.user.id,
+      provider: provider.providerId,
+      rating: 5,
+    });
+    expect(review.category).toBeNull();
+
+    expect(await Review.backfillCategories()).toBeGreaterThanOrEqual(1);
+    expect(String((await Review.findById(review._id)).category)).toBe(String(category._id));
   });
 });
