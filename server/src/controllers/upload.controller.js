@@ -1,44 +1,34 @@
-import imagekit from "../config/imageKit.js";
+import User from "../models/user.model.js";
+import { uploadImage } from "../services/imageStorage.service.js";
+import ApiError from "../utils/ApiError.js";
 
 /**
- * Upload profile image.
+ * Upload profile image (max 1 MB) and save it as the user's avatar.
  *
- * Receives an image through Multer memory storage
- * and uploads the image buffer directly to ImageKit.
+ * Multer keeps the file in memory and the buffer goes
+ * directly to ImageKit.
  *
- * @route   PATCH /api/upload/image
+ * @route   PATCH /api/upload/avatar   (multipart/form-data, field "image")
  * @access  Private
  * @returns ImageKit image URL and file ID
  */
 export const uploadProfileImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Please select an image",
-      });
-    }
-
-    const result = await imagekit.upload({
-      file: req.file.buffer,
-      fileName: `${Date.now()}_${req.file.originalname}`,
-      folder: "/service-provider-app/avatars",
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Profile image updated successfully",
-      image: {
-        url: result.url,
-        fileId: result.fileId,
-      },
-    });
-  } catch (error) {
-    console.error("Image Upload Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to upload image",
-    });
+  if (!req.file) {
+    throw new ApiError(400, "Please select an image");
   }
+
+  const image = await uploadImage(req.file, "avatars");
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { avatar: image.url },
+    { returnDocument: "after" },
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Profile image updated successfully",
+    image,
+    user,
+  });
 };

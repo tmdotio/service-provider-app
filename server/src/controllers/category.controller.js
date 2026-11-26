@@ -1,6 +1,68 @@
 import mongoose from "mongoose";
 import ServiceProvider from "../models/serviceProvider.model.js";
 import Category from "../models/category.model.js";
+import {
+  CACHE_KEYS,
+  cacheProviders,
+  clearCache,
+  setCacheHeader,
+} from "../services/cache.service.js";
+
+/**
+ * List all categories with the number of approved providers in each.
+ * Cached in Redis for 1 hour, and refreshed after any category or
+ * provider change.
+ *
+ * @route   GET /api/categories
+ * @access  Public
+ */
+export const getAllCategories = async (req, res) => {
+  const cache = {};
+  // Versioned with the provider cache: the provider counts change when a
+  // provider is approved, deactivated or changes services, not only when
+  // a category is edited, so any provider change refreshes this too.
+  const categories = await cacheProviders(CACHE_KEYS.categories, 3600, () =>
+    Category.aggregate([
+      { $sort: { name: 1 } },
+      {
+        $lookup: {
+          from: "providers",
+          let: { categoryId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $in: ["$$categoryId", "$categories"] },
+                verificationStatus: "approved",
+              },
+            },
+            // Same rule as search: providers of deactivated accounts don't count
+            { $lookup: { from: "users", localField: "user", foreignField: "_id", as: "account" } },
+            { $match: { "account.isActive": { $ne: false } } },
+            { $count: "count" },
+          ],
+          as: "providerStats",
+        },
+      },
+      {
+        $project: {
+          name: 1,
+          providersCount: {
+            $ifNull: [{ $arrayElemAt: ["$providerStats.count", 0] }, 0],
+          },
+        },
+      },
+    ]),
+    cache,
+  );
+  setCacheHeader(res, cache);
+
+
+  res.status(200).json({
+    success: true,
+    count: categories.length,
+    categories,
+  });
+};
 
 /**
  * Create a new category.
@@ -25,6 +87,7 @@ export const createCategory = async (req, res) => {
     }
 
     const category = await Category.create({ name });
+    await clearCache(CACHE_KEYS.categories);
 
     return res.status(201).json({
       success: true,
@@ -83,7 +146,7 @@ export const updateCategory = async (req, res) => {
     const category = await Category.findByIdAndUpdate(
       id,
       { name },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!category) {
@@ -92,6 +155,8 @@ export const updateCategory = async (req, res) => {
         message: "Category not found",
       });
     }
+
+    await clearCache(CACHE_KEYS.categories);
 
     return res.status(200).json({
       success: true,
@@ -144,8 +209,9 @@ export const deleteCategory = async (req, res) => {
       });
     }
 
+    // FIX: the field is `categories` (array), not `category`
     const isCategoryUsed = await ServiceProvider.exists({
-      category: id,
+      categories: id,
     });
 
     if (isCategoryUsed) {
@@ -156,6 +222,7 @@ export const deleteCategory = async (req, res) => {
     }
 
     await Category.findByIdAndDelete(id);
+    await clearCache(CACHE_KEYS.categories);
 
     return res.status(200).json({
       success: true,

@@ -64,18 +64,27 @@ const providerSchema = new mongoose.Schema(
       },
     ],
 
+
     location: {
-      type: {
+      city: {
         type: String,
-        enum: ["Point"],
-        default: "Point",
+        required: [true, "City is required"],
+        trim: true,
       },
 
-      coordinates: {
-        type: [Number],
-        default: undefined,
+      province: {
+        type: String,
+        required: [true, "Province is required"],
+        trim: true,
+      },
+
+      country: {
+        type: String,
+        required: [true, "Country is required"],
+        trim: true,
       },
     },
+
 
     verificationStatus: {
       type: String,
@@ -107,13 +116,28 @@ const providerSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+
+    // Cover image on the public profile (uploaded to ImageKit)
+    bannerImage: {
+      url: { type: String, default: "" },
+      fileId: { type: String, default: "" },
+    },
+
+    // How many times customers reported the provider did not come
+    noShowCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-providerSchema.index({ location: "2dsphere" });
+providerSchema.index({ verificationStatus: 1, categories: 1 });
+providerSchema.index({ "location.city": 1 });
+
 
 const ServiceProvider = mongoose.model("provider", providerSchema);
 

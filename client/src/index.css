@@ -1,0 +1,314 @@
+@import "tailwindcss";
+
+/* Dark mode is on when <html> has the "dark" class (see useTheme.js) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Pages only use these names (bg-surface, text-muted,
+ * border-line, bg-accent...), so light/dark is switched in one place.
+ */
+:root {
+  --bg: #f3f1ec;
+  --surface: #ffffff;
+  --surface-2: #f0ede7;
+  --line: #e3dfd7;
+  --fg: #151413;
+  --muted: #6e6a63;
+  --accent: #f29a2e;
+  --accent-hover: #e48a1c;
+  --accent-ink: #1c1206;
+  --glow-1: rgb(242 154 46 / 0.22);
+  --glow-2: rgb(255 214 153 / 0.35);
+  --glass: rgb(255 255 255 / 0.62);
+  --glass-line: rgb(21 20 19 / 0.08);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0a0a0b;
+  --surface: #151517;
+  --surface-2: #1f1f22;
+  --line: #2a2a2f;
+  --fg: #f5f4f2;
+  --muted: #9a9890;
+  --accent: #f6a33b;
+  --accent-hover: #ffb75e;
+  --accent-ink: #1c1206;
+  --glow-1: rgb(246 163 59 / 0.16);
+  --glow-2: rgb(120 90 255 / 0.08);
+  --glass: rgb(26 26 29 / 0.6);
+  --glass-line: rgb(255 255 255 / 0.08);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --font-sans: "Urbanist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", "Urbanist Variable", sans-serif;
+}
+
+/* ---------- Base ---------- */
+
+@layer base {
+  /* Tailwind v4 borders default to the text colour; use the theme line colour */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--line);
+  }
+}
+
+body {
+  @apply bg-bg font-sans text-fg antialiased;
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(50rem 35rem at 100% 0%, var(--glow-2), transparent 60%);
+  background-attachment: fixed;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Skeleton shimmer: a soft light band sweeping across */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Results rise in one after another */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Loading line that slides under the search bar */
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* Rotating light around the search bar while it is focused */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glow-spin {
+  to {
+    --glow-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Bigger tap targets and no grey tap flash on phones */
+@media (pointer: coarse) {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ---------- Reusable classes ---------- */
+
+/* Wide, heavy headline like "WORKSPACE" in the reference */
+@utility font-wide {
+  font-family: var(--font-display);
+  font-stretch: 125%;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-accent text-accent-ink hover:bg-accent-hover;
+  box-shadow: 0 6px 20px -8px var(--accent);
+}
+
+@utility btn-outline {
+  @apply btn border border-line bg-surface text-fg hover:border-fg/30;
+}
+
+@utility btn-ghost {
+  @apply btn text-muted hover:bg-surface-2 hover:text-fg;
+}
+
+@utility btn-danger {
+  @apply btn bg-rose-600 text-white hover:bg-rose-700;
+}
+
+/* Round icon button (the ↗ arrows and side-rail icons) */
+@utility icon-btn {
+  @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-fg transition hover:border-accent hover:text-accent;
+}
+
+@utility input {
+  @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-base text-fg outline-none sm:py-2.5 sm:text-sm transition placeholder:text-muted/70 focus:border-accent focus:ring-4 focus:ring-accent/15;
+}
+
+@utility label {
+  @apply mb-1.5 block text-sm font-semibold text-fg;
+}
+
+@utility card {
+  @apply rounded-[28px] border border-line bg-surface;
+}
+
+/* Frosted glass panel */
+@utility glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+/* Filter pills: "All", "Hot client"... */
+@utility chip {
+  @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-medium text-fg transition hover:border-fg/30;
+}
+
+@utility chip-active {
+  @apply border-fg bg-fg text-bg hover:border-fg;
+}
+
+/*
+ * The signature card: a round "notch" is cut out of the top-right
+ * corner with a CSS mask, and a round arrow button sits inside it.
+ * Works on any background because the hole is truly transparent.
+ */
+@utility notch {
+  --notch-r: 30px;
+  --notch-x: 26px;
+  -webkit-mask: radial-gradient(
+    circle var(--notch-r) at calc(100% - var(--notch-x)) var(--notch-x),
+    #0000 98%,
+    #000 100%
+  );
+  mask: radial-gradient(
+    circle var(--notch-r) at calc(100% - var(--notch-x)) var(--notch-x),
+    #0000 98%,
+    #000 100%
+  );
+}
+
+/* Grey block with a moving shine, shown while content loads */
+@utility skeleton {
+  background-color: var(--surface-2);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--fg) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Fade + rise in; use style={{ animationDelay }} to stagger */
+@utility animate-rise {
+  animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/*
+ * Search bar glow: a thin orange light runs around the edge while
+ * the user is typing (any input inside is focused).
+ */
+@utility search-glow {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(from var(--glow-angle), transparent 0deg, var(--accent) 60deg, #ffd29a 100deg, transparent 160deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: glow-spin 3s linear infinite;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    z-index: -2;
+    border-radius: inherit;
+    background: var(--accent);
+    filter: blur(28px);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  &:focus-within::before {
+    opacity: 1;
+  }
+
+  &:focus-within::after {
+    opacity: 0.18;
+  }
+}
+
+/* Warm orange gradient used on highlighted cards */
+@utility bg-accent-gradient {
+  background-image: linear-gradient(135deg, #ffc46b 0%, #f6a33b 45%, #ef7d22 100%);
+}
+
+/* Gradient text */
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--fg) 30%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

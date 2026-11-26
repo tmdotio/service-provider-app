@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { registerValidator } from "../validator/register.validator.js";
 import { getMe, login, logout, refreshAccessToken, register, updateUserProfile } from "../controllers/auth.controller.js";
 import { loginValidator } from "../validator/login.validator.js";
@@ -10,18 +11,35 @@ import { updateUserProfileValidator } from "../validator/updateProfile.validator
 
 const authRoute = Router();
 
+/**
+ * Max 10 login/register attempts per 15 minutes per IP
+ * (stops password guessing). Turned off in tests.
+ */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  message: {
+    success: false,
+    message: "Too many attempts. Please try again in 15 minutes.",
+  },
+});
+
 
 
 /**
  * Registers a new user account.
  * @route   POST /api/auth/register
  * @access  Public
- * @body    name, email, password, role
+ * @body    name, email, password, phone?  (always registers as customer)
  * @returns Newly created user information
  */
 
 authRoute.post(
   "/register",
+  authLimiter,
   registerValidator,
   validateRequest,
   register
@@ -36,7 +54,7 @@ authRoute.post(
  * @returns Logged-in user information and access token
  */
 
-authRoute.post("/login",loginValidator,validateRequest,login)
+authRoute.post("/login", authLimiter, loginValidator, validateRequest, login);
 
 
 
@@ -67,14 +85,16 @@ authRoute.get("/get-me",authenticate,getMe)
  * @access  Private
  * @returns clear cookies and refreshToken = null
  */
-authRoute.get("/logout",authenticate,logout)
+authRoute.post("/logout", authenticate, logout);
+// Old GET version kept so existing clients don't break
+authRoute.get("/logout", authenticate, logout);
 
 
 /**
  * Update the authenticated customer's profile.
  *
  * @route   PATCH /api/update-profile
- * @access  Private/Customer
+ * @access  Private (any role)
  * @body    name, phone, avatar
  * @returns Updated customer profile data
  */
@@ -84,7 +104,6 @@ authRoute.get("/logout",authenticate,logout)
 authRoute.patch(
   "/update-profile",
   authenticate,
-  authorizeRoles("customer"),
   updateUserProfileValidator,
   validateRequest,
   updateUserProfile

@@ -1,0 +1,60 @@
+export const APP_NAME = "Ustaad";
+export const APP_TAGLINE = "Trusted service providers near you";
+
+/** "5 minutes ago", "2 days ago"... */
+export const timeAgo = (date) => {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  const units = [
+    ["year", 31536000],
+    ["month", 2592000],
+    ["day", 86400],
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  for (const [name, size] of units) {
+    const value = Math.floor(seconds / size);
+    if (value >= 1) return `${value} ${name}${value > 1 ? "s" : ""} ago`;
+  }
+  return "just now";
+};
+
+export const formatDate = (date) =>
+  new Date(date).toLocaleString("en-PK", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+export const initials = (name = "") =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+
+export const MAX_IMAGE_MB = 1;
+export const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+export const MAX_POST_IMAGE_MB = 5;
+export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Returns an error message, or null if the file is OK. */
+export const checkImageFile = (file, maxMB = MAX_IMAGE_MB) => {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return `${file.name}: only JPG, PNG or WEBP images are allowed`;
+  }
+  if (file.size > maxMB * 1024 * 1024) {
+    return `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB. Max is ${maxMB} MB.`;
+  }
+  return null;
+};
+
+/**
+ * ImageKit can resize on the fly: ask for the size we really show
+ * (x2 for sharp phone screens) instead of downloading the full photo.
+ * Other URLs (data:, other hosts) are returned unchanged.
+ */
+export const ikUrl = (url, { w, h, face = false } = {}) => {
+  if (!url || !url.includes("ik.imagekit.io")) return url;
+  const parts = [w && `w-${w * 2}`, h && `h-${h * 2}`, face && "fo-face", "q-80", "f-auto"].filter(Boolean);
+  return `${url}${url.includes("?") ? "&" : "?"}tr=${parts.join(",")}`;
+};

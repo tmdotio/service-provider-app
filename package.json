@@ -1,0 +1,13 @@
+{
+  "name": "ustaad",
+  "private": true,
+  "description": "Ustaad: find trusted service providers. Express API + React app in one service.",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "npm ci --prefix server --omit=dev && npm ci --prefix client --include=dev && npm run build --prefix client",
+    "start": "node server/server.js",
+    "test": "npm test --prefix server"
+  }
+}

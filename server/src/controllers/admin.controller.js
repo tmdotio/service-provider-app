@@ -1,4 +1,12 @@
+import Booking from "../models/booking.model.js";
+import Post from "../models/post.model.js";
+import Report from "../models/report.model.js";
 import ServiceProvider from "../models/serviceProvider.model.js";
+import { deleteChatsOfUser } from "../services/chat.service.js";
+import { notify } from "../services/notification.service.js";
+import { disconnectUser } from "../socket/emitter.js";
+import ApiError from "../utils/ApiError.js";
+import { getPagination, paginationMeta } from "../utils/pagination.js";
 import User from "../models/user.model.js";
 
 /**
@@ -48,7 +56,6 @@ export const reviewProviderRequest = async (req, res) => {
       });
     }
 
-    console.log("User ID:", providerApplication.user);
 
     // Only pending applications can be reviewed
     if (providerApplication.verificationStatus !== "pending") {
@@ -89,6 +96,12 @@ export const reviewProviderRequest = async (req, res) => {
         });
       }
 
+      await notify(
+        updatedUser._id,
+        "provider_approved",
+        "Your provider application was approved. Go online to start getting bookings!",
+      );
+
       return res.status(200).json({
         success: true,
         message: "Provider application approved successfully",
@@ -107,6 +120,12 @@ export const reviewProviderRequest = async (req, res) => {
     await ServiceProvider.findOneAndDelete({
       user: id,
     });
+
+    await notify(
+      id,
+      "provider_rejected",
+      `Your provider application was rejected. Reason: ${rejectionReason.trim()}`,
+    );
 
     return res.status(200).json({
       success: true,
@@ -128,22 +147,35 @@ export const reviewProviderRequest = async (req, res) => {
  * Fetches all users from the database while excluding
  * sensitive fields such as password and refresh token.
  *
- * @route   GET /api/admin/users
+ * @route   GET /api/admin/users?q=&role=&status=&page=&limit=
  * @access  Private/Admin
- * @returns All registered users
+ * @query   q (name or email), role (customer|provider), status (active|inactive)
+ * @returns One page of users (newest first) + pagination
  */
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({
-      role: { $ne: "admin" },
-    })
-      .select("-password -refreshToken")
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = getPagination(req.query, 20, 100);
+    const filter = { role: { $ne: "admin" } };
+    if (["customer", "provider"].includes(req.query.role)) filter.role = req.query.role;
+    if (req.query.status === "active") filter.isActive = true;
+    if (req.query.status === "inactive") filter.isActive = false;
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    if (q) {
+      // Escape regex characters so a search like "a+b" is taken literally
+      const safe = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: safe }, { email: safe }];
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(filter).select("-password -refreshToken").sort({ createdAt: -1 }).skip(skip).limit(limit),
+      User.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       count: users.length,
       users,
+      pagination: paginationMeta(total, page, limit),
     });
   } catch (error) {
     console.error("Get All Users Error:", error);
@@ -218,7 +250,7 @@ export const getPendingProviderRequests = async (req, res) => {
         "name email phone avatar role"
       )
       .populate(
-        "category",
+        "categories",
         "name"
       )
       .sort({ createdAt: -1 });
@@ -341,8 +373,7 @@ export const updateProviderByAdmin = async (req, res) => {
       "businessPhone",
       "description",
       "experienceYears",
-      "category",
-      "serviceAreas",
+      "categories",
       "location",
       "availabilityStatus",
     ];
@@ -460,7 +491,9 @@ export const deleteUserByAdmin = async (req, res) => {
       });
     }
 
+    await deleteChatsOfUser(user._id);
     await User.findByIdAndDelete(user._id);
+    disconnectUser(user._id); // their open tabs lose the live chat at once
 
     return res.status(200).json({
       success: true,
@@ -508,9 +541,8 @@ export const updateUserStatus = async (req, res) => {
         _id: id,
         role: { $ne: "admin" },
       },
-      {
-        isActive,
-      },
+      // Deactivating also signs them out everywhere (no new access tokens)
+      isActive ? { isActive } : { isActive, refreshToken: null },
       {
         returnDocument: "after",
         runValidators: true,
@@ -523,6 +555,9 @@ export const updateUserStatus = async (req, res) => {
         message: "User not found",
       });
     }
+
+    // A deactivated user must not keep chatting through an open socket
+    if (!isActive) disconnectUser(user._id);
 
     return res.status(200).json({
       success: true,
@@ -653,51 +688,196 @@ export const getSingleProvider = async (req, res) => {
  * @returns Dashboard statistics
  */
 export const getDashboardStats = async (req, res) => {
-  try {
-    const totalUsers = await User.countDocuments({
-      role: { $ne: "admin" },
-    });
+  const [
+    totalUsers,
+    totalCustomers,
+    totalProviders,
+    activeUsers,
+    inactiveUsers,
+    pendingProviderRequests,
+    bookingsByStatusRaw,
+    totalPosts,
+    pendingReports,
+    topProviders,
+  ] = await Promise.all([
+    User.countDocuments({ role: { $ne: "admin" } }),
+    User.countDocuments({ role: "customer" }),
+    User.countDocuments({ role: "provider" }),
+    User.countDocuments({ role: { $ne: "admin" }, isActive: true }),
+    User.countDocuments({ role: { $ne: "admin" }, isActive: false }),
+    ServiceProvider.countDocuments({ verificationStatus: "pending" }),
+    Booking.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Post.countDocuments(),
+    Report.countDocuments({ status: "pending" }),
+    ServiceProvider.find({ verificationStatus: "approved" })
+      .sort({ completedJobs: -1, averageRating: -1 })
+      .limit(5)
+      .select("businessName completedJobs averageRating noShowCount")
+      .lean(),
+  ]);
 
-    const totalCustomers = await User.countDocuments({
-      role: "customer",
-    });
+  const bookingsByStatus = Object.fromEntries(
+    bookingsByStatusRaw.map((item) => [item._id, item.count]),
+  );
+  const totalBookings = bookingsByStatusRaw.reduce((sum, i) => sum + i.count, 0);
 
-    const totalProviders = await User.countDocuments({
-      role: "provider",
-    });
+  return res.status(200).json({
+    success: true,
+    stats: {
+      totalUsers,
+      totalCustomers,
+      totalProviders,
+      activeUsers,
+      inactiveUsers,
+      pendingProviderRequests,
+      totalBookings,
+      bookingsByStatus,
+      totalPosts,
+      pendingReports,
+      topProviders,
+    },
+  });
+};
 
-    const activeUsers = await User.countDocuments({
-      role: { $ne: "admin" },
-      isActive: true,
-    });
+/**
+ * All bookings with filters.
+ *
+ * @route   GET /api/admin/bookings?status=&page=&limit=
+ * @access  Private/Admin
+ */
+export const getAllBookings = async (req, res) => {
+  const { page, limit, skip } = getPagination(req.query, 20);
 
-    const inactiveUsers = await User.countDocuments({
-      role: { $ne: "admin" },
-      isActive: false,
-    });
-
-    const pendingProviderRequests =
-      await ServiceProvider.countDocuments({
-        verificationStatus: "pending",
-      });
-
-    return res.status(200).json({
-      success: true,
-      stats: {
-        totalUsers,
-        totalCustomers,
-        totalProviders,
-        activeUsers,
-        inactiveUsers,
-        pendingProviderRequests,
-      },
-    });
-  } catch (error) {
-    console.error("Get Dashboard Stats Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+  const filter = {};
+  if (req.query.status) {
+    filter.status = String(req.query.status);
   }
+
+  const [bookings, total] = await Promise.all([
+    Booking.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("customer", "name email phone")
+      .populate("provider", "businessName businessPhone")
+      .populate("category", "name")
+      .lean(),
+    Booking.countDocuments(filter),
+  ]);
+
+  res.status(200).json({
+    success: true,
+    bookings,
+    pagination: paginationMeta(total, page, limit),
+  });
+};
+
+/**
+ * Reported posts, grouped by post, most reported first.
+ *
+ * @route   GET /api/admin/reports?status=pending
+ * @access  Private/Admin
+ */
+export const getReports = async (req, res) => {
+  const status = req.query.status || "pending";
+  const { page, limit, skip } = getPagination(req.query, 20);
+
+  const [result] = await Report.aggregate([
+    { $match: { status } },
+    {
+      $group: {
+        _id: "$post",
+        reportsCount: { $sum: 1 },
+        reasons: { $addToSet: "$reason" },
+        details: { $push: "$details" },
+        lastReportedAt: { $max: "$createdAt" },
+      },
+    },
+    { $sort: { reportsCount: -1, lastReportedAt: -1 } },
+    {
+      $facet: {
+        items: [
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: "posts",
+              localField: "_id",
+              foreignField: "_id",
+              as: "post",
+              pipeline: [{ $project: { likes: 0 } }],
+            },
+          },
+          { $unwind: { path: "$post", preserveNullAndEmptyArrays: true } },
+        ],
+        total: [{ $count: "count" }],
+      },
+    },
+  ]);
+
+  const total = result.total[0]?.count || 0;
+
+  res.status(200).json({
+    success: true,
+    reports: result.items,
+    pagination: paginationMeta(total, page, limit),
+  });
+};
+
+/**
+ * Resolve all pending reports of a post.
+ *
+ * - action "remove":  hide the post and tell the author
+ * - action "dismiss": reports were wrong, show the post again
+ *
+ * @route   PATCH /api/admin/reports/:postId
+ * @access  Private/Admin
+ * @body    action: "remove" | "dismiss"
+ */
+export const resolveReports = async (req, res) => {
+  const { postId } = req.params;
+  const { action } = req.body;
+
+  if (!["remove", "dismiss"].includes(action)) {
+    throw new ApiError(400, "Action must be remove or dismiss");
+  }
+
+  const post = await Post.findById(postId);
+  if (!post) {
+    throw new ApiError(404, "Post not found");
+  }
+
+  const result = await Report.updateMany(
+    { post: post._id, status: "pending" },
+    {
+      status: action === "remove" ? "action_taken" : "dismissed",
+      reviewedBy: req.user._id,
+      reviewedAt: new Date(),
+    },
+  );
+
+  if (result.matchedCount === 0) {
+    throw new ApiError(404, "No pending reports for this post");
+  }
+
+  post.isHidden = action === "remove";
+  await post.save();
+
+  if (action === "remove") {
+    await notify(
+      post.author,
+      "post_removed",
+      "One of your posts was removed because it broke the community rules",
+      { post: post._id },
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+    message:
+      action === "remove"
+        ? "Post removed and reports closed"
+        : "Reports dismissed and post is visible",
+    reportsResolved: result.modifiedCount,
+  });
 };

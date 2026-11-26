@@ -1,13 +1,25 @@
 import ImageKit from "imagekit";
 
-const imagekit = new ImageKit({
+/**
+ * Created on first use, so the server and the tests can start
+ * even when ImageKit keys are not set.
+ */
+let client = null;
 
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+const getClient = () => {
+  if (!client) {
+    client = new ImageKit({
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+      privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+      urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
+    });
+  }
+  return client;
+};
 
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
-  
-});
+const imagekit = {
+  upload: (options) => getClient().upload(options),
+  deleteFile: (fileId) => getClient().deleteFile(fileId),
+};
 
 export default imagekit;

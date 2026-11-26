@@ -59,3 +59,28 @@ export const authenticate = async (req, res, next) => {
     });
   }
 };
+
+/**
+ * Like `authenticate`, but does not fail when there is no token.
+ * Used on public routes that show extra info to logged-in users
+ * (for example "likedByMe" on posts).
+ */
+export const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+
+  try {
+    const { userId } = verifyAccessToken(authHeader.split(" ")[1]);
+    const user = await User.findById(userId).select("_id name role isActive");
+    if (user?.isActive) {
+      req.user = user;
+    }
+  } catch {
+    // Invalid token on a public route: continue as a guest
+  }
+
+  next();
+};
